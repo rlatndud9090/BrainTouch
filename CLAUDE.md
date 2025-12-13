@@ -20,9 +20,32 @@
 
 | 기술 | 버전 | 용도 |
 |------|------|------|
-| **Phaser 3** | ^3.80.1 | 2D 게임 엔진 |
+| **React** | ^18.2.0 | UI 프레임워크 |
+| **React Router** | ^6.22.3 | 페이지 라우팅 |
+| **Phaser 3** | ^3.80.1 | 2D 게임 엔진 (게임 코어만) |
 | **TypeScript** | ^5.3.3 | 타입 안정성 |
 | **Vite** | ^5.4.11 | 번들러 & 개발 서버 |
+| **TailwindCSS** | ^3.4.3 | UI 스타일링 |
+
+---
+
+## 🏗️ 아키텍처
+
+```
+┌─────────────────────────────────────────┐
+│              React App                  │
+├─────────────────────────────────────────┤
+│  HomePage   │  GamePage  │  RankingPage │  ← React 페이지
+├─────────────┴────────────┴──────────────┤
+│         PhaserGame 컴포넌트             │  ← React-Phaser 브릿지
+├─────────────────────────────────────────┤
+│           Phaser 3 Game                 │  ← 게임 로직
+│      (brain-touch, puzzle-pop 등)       │
+└─────────────────────────────────────────┘
+```
+
+- **UI/메뉴/랭킹**: React + TailwindCSS
+- **게임 플레이**: Phaser 3 캔버스
 
 ---
 
@@ -31,40 +54,55 @@
 ```
 BrainTouch/
 ├── src/
-│   ├── main.ts              # 진입점 - Phaser 게임 인스턴스 생성
-│   ├── game/
-│   │   └── config.ts        # Phaser 게임 설정 (스케일, 물리엔진 등)
-│   └── scenes/
-│       └── MainScene.ts     # 메인 씬 (현재 타이틀 화면)
-├── public/                  # 정적 에셋 (아직 없음)
-│   └── assets/              # 이미지, 오디오, 폰트
-├── index.html               # HTML 엔트리 (모바일 최적화 메타태그)
-├── package.json             # 의존성 관리
-├── tsconfig.json            # TypeScript 설정
-├── vite.config.ts           # Vite 설정 (상대경로 빌드)
-├── CONVENTION.md            # 브랜치/커밋 컨벤션 규칙
-├── README.md                # 프로젝트 문서
-└── CLAUDE.md                # 이 파일 (AI 컨텍스트)
+│   ├── main.tsx                    # React 진입점
+│   ├── App.tsx                     # 라우터 설정
+│   ├── index.css                   # 글로벌 스타일 + Tailwind
+│   ├── pages/
+│   │   ├── HomePage.tsx            # 게임 목록 (카드뷰)
+│   │   ├── GamePage.tsx            # 게임 플레이 화면
+│   │   └── RankingPage.tsx         # 랭킹 화면
+│   ├── components/
+│   │   ├── GameCard.tsx            # 게임 카드 컴포넌트
+│   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
+│   └── games/
+│       └── brain-touch/            # Brain Touch 게임
+│           ├── config.ts           # Phaser 설정
+│           └── scenes/
+│               └── MainScene.ts    # 메인 게임 씬
+├── public/                         # 정적 에셋
+│   └── assets/                     # 이미지, 오디오, 폰트
+├── index.html                      # HTML 템플릿
+├── package.json                    # 의존성 관리
+├── tsconfig.json                   # TypeScript 설정
+├── vite.config.ts                  # Vite 설정
+├── tailwind.config.js              # TailwindCSS 설정
+├── postcss.config.js               # PostCSS 설정
+├── CONVENTION.md                   # 브랜치/커밋 컨벤션
+├── README.md                       # 프로젝트 문서
+└── CLAUDE.md                       # 이 파일 (AI 컨텍스트)
 ```
 
 ---
 
 ## 📄 주요 파일 설명
 
-### `src/main.ts`
-- Phaser.Game 인스턴스 생성
-- 윈도우 리사이즈 이벤트 핸들링
+### `src/main.tsx`
+- React 앱 진입점
+- BrowserRouter 래핑
 
-### `src/game/config.ts`
-- Phaser 게임 설정 객체
-- 스케일 모드: `Phaser.Scale.RESIZE` (반응형)
-- 물리엔진: Arcade (gravity 없음)
-- 멀티터치 3개 지원
+### `src/App.tsx`
+- React Router 설정
+- 페이지 라우팅: `/`, `/game/:gameId`, `/ranking`
 
-### `src/scenes/MainScene.ts`
-- 현재 유일한 씬
-- 타이틀 텍스트 "🧠 Brain Touch" 표시
-- 터치 시 콘솔 로그 출력 (추후 게임 씬으로 전환 예정)
+### `src/components/PhaserGame.tsx`
+- Phaser 게임을 React 컴포넌트로 래핑
+- 게임별 설정을 동적 import
+- 리사이즈 핸들링
+
+### `src/games/brain-touch/`
+- Brain Touch 게임 코드
+- `config.ts`: Phaser 설정 생성 함수
+- `scenes/MainScene.ts`: 게임 로직 (터치 게임)
 
 ---
 
@@ -102,16 +140,32 @@ refactor/<game-name>-<description>
 
 ### ✅ 완료
 - [x] 프로젝트 초기 환경 구축 (Vite + TS + Phaser3)
-- [x] 기본 프로젝트 구조 생성
-- [x] 모바일 웹뷰 최적화 설정
+- [x] React + Phaser 하이브리드 아키텍처로 마이그레이션
+- [x] TailwindCSS 설정
+- [x] 페이지 구조 생성 (Home, Game, Ranking)
+- [x] Phaser 래퍼 컴포넌트 구현
+- [x] Brain Touch 기본 게임 로직 구현
 - [x] 개발 컨벤션 문서 작성
-- [x] GitHub 리포지토리 연결 및 초기 커밋
+- [x] GitHub 리포지토리 연결
 
 ### 🔲 예정
-- [ ] 게임 기획 및 디자인
-- [ ] 게임 플레이 씬 구현
+- [ ] 게임 UI/UX 개선
 - [ ] 에셋 추가 (이미지, 사운드)
-- [ ] 앱인토스 연동 테스트
+- [ ] 점수 저장 시스템
+- [ ] 토스 계정 연동
+- [ ] 랭킹 시스템 구현
+- [ ] 앱인토스 배포 테스트
+
+---
+
+## 🎮 게임 추가 방법
+
+새 게임을 추가하려면:
+
+1. `src/games/<game-name>/` 폴더 생성
+2. `config.ts` 생성 (getGameConfig 함수 export)
+3. `scenes/` 폴더에 씬 파일 추가
+4. `src/pages/HomePage.tsx`의 games 배열에 추가
 
 ---
 
@@ -126,9 +180,9 @@ refactor/<game-name>-<description>
 
 | 날짜 | 작업 내용 |
 |------|-----------|
+| 2025-12-14 | React + Phaser 하이브리드 구조로 마이그레이션 |
 | 2025-12-14 | 프로젝트 초기 환경 구축, 컨벤션 문서 작성 |
 
 ---
 
 *마지막 업데이트: 2025-12-14*
-

@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   base: './', // 상대 경로로 빌드 (앱인토스 웹뷰 호환)
   server: {
     port: 3000,
@@ -11,7 +13,6 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     minify: 'terser',
-    target: 'es2015', // 모바일 브라우저 호환성
+    target: 'es2015',
   },
 });
-

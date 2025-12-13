@@ -1,0 +1,56 @@
+import { Link } from 'react-router-dom';
+import GameCard from '../components/GameCard';
+
+// 게임 목록 데이터 (추후 확장)
+const games = [
+  {
+    id: 'brain-touch',
+    title: '🧠 Brain Touch',
+    description: '빠른 터치로 두뇌를 깨워보세요!',
+    color: 'from-purple-500 to-pink-500',
+  },
+  // 추후 게임 추가
+];
+
+export default function HomePage() {
+  return (
+    <div className="w-full h-full flex flex-col bg-toss-black">
+      {/* 헤더 */}
+      <header className="flex items-center justify-between px-5 py-4 border-b border-toss-gray-600">
+        <h1 className="text-xl font-bold">🎮 Brain Touch</h1>
+        <Link 
+          to="/ranking" 
+          className="text-toss-blue text-sm font-medium"
+        >
+          랭킹
+        </Link>
+      </header>
+
+      {/* 게임 목록 */}
+      <main className="flex-1 overflow-y-auto p-5">
+        <h2 className="text-lg font-semibold text-toss-gray-200 mb-4">
+          게임 선택
+        </h2>
+        
+        <div className="grid gap-4">
+          {games.map((game) => (
+            <GameCard key={game.id} {...game} />
+          ))}
+        </div>
+
+        {/* 빈 상태 */}
+        {games.length === 0 && (
+          <div className="flex items-center justify-center h-40 text-toss-gray-400">
+            게임을 준비 중입니다...
+          </div>
+        )}
+      </main>
+
+      {/* 푸터 */}
+      <footer className="px-5 py-3 text-center text-xs text-toss-gray-400 border-t border-toss-gray-600">
+        © 2025 Brain Touch
+      </footer>
+    </div>
+  );
+}
+
