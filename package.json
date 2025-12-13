@@ -1,0 +1,28 @@
+{
+  "name": "brain-touch",
+  "version": "0.0.1",
+  "description": "BrainTouch - 앱인토스용 Phaser3 게임",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "phaser",
+    "phaser3",
+    "game",
+    "app-in-toss",
+    "brain-touch"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.4.11"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  }
+}
+
