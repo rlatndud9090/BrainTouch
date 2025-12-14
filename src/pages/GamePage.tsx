@@ -9,9 +9,9 @@ export default function GamePage() {
     navigate('/');
   };
 
-  const handleGameOver = (score: number) => {
-    console.log('Game Over! Score:', score);
-    // TODO: 점수 저장, 결과 화면 표시 등
+  const handleGameOver = () => {
+    // 게임 종료 시 홈으로 이동
+    navigate('/');
   };
 
   return (
@@ -24,20 +24,14 @@ export default function GamePage() {
         >
           ← 뒤로
         </button>
-        <h1 className="flex-1 text-center font-semibold capitalize">
-          {gameId?.replace('-', ' ')}
-        </h1>
+        <h1 className="flex-1 text-center font-semibold capitalize">{gameId?.replace('-', ' ')}</h1>
         <div className="w-10" /> {/* 균형을 위한 빈 공간 */}
       </header>
 
       {/* Phaser 게임 영역 */}
       <main className="flex-1 relative overflow-hidden">
-        <PhaserGame 
-          gameId={gameId || 'brain-touch'} 
-          onGameOver={handleGameOver}
-        />
+        <PhaserGame gameId={gameId || 'brain-touch'} onGameOver={handleGameOver} />
       </main>
     </div>
   );
 }
-

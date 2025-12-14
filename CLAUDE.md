@@ -7,25 +7,26 @@
 
 ## 📌 프로젝트 개요
 
-| 항목 | 내용 |
-|------|------|
-| **프로젝트명** | BrainTouch (브레인 터치) |
-| **목적** | 앱인토스(App-in-Toss) 플랫폼에 웹뷰로 올릴 미니게임 |
-| **게임 컨셉** | 터치를 통해 푸는 두뇌 미니게임들 모음 |
-| **플랫폼** | 모바일 웹뷰 (토스 앱 내) |
+| 항목           | 내용                                                |
+| -------------- | --------------------------------------------------- |
+| **프로젝트명** | BrainTouch (브레인 터치)                            |
+| **목적**       | 앱인토스(App-in-Toss) 플랫폼에 웹뷰로 올릴 미니게임 |
+| **게임 컨셉**  | 터치를 통해 푸는 두뇌 미니게임들 모음               |
+| **플랫폼**     | 모바일 웹뷰 (토스 앱 내)                            |
 
 ---
 
 ## 🛠 기술 스택
 
-| 기술 | 버전 | 용도 |
-|------|------|------|
-| **React** | ^18.2.0 | UI 프레임워크 |
-| **React Router** | ^6.22.3 | 페이지 라우팅 |
-| **Phaser 3** | ^3.80.1 | 2D 게임 엔진 (게임 코어만) |
-| **TypeScript** | ^5.3.3 | 타입 안정성 |
-| **Vite** | ^5.4.11 | 번들러 & 개발 서버 |
-| **TailwindCSS** | ^3.4.3 | UI 스타일링 |
+| 기술              | 버전        | 용도                        |
+| ----------------- | ----------- | --------------------------- |
+| **React**         | ^18.2.0     | UI 프레임워크               |
+| **React Router**  | ^6.22.3     | 페이지 라우팅               |
+| **Phaser 3**      | ^3.80.1     | 2D 게임 엔진 (게임 코어만)  |
+| **TypeScript**    | ^5.3.3      | 타입 안정성                 |
+| **Vite**          | ^5.4.11     | 번들러 & 개발 서버          |
+| **TailwindCSS**   | ^3.4.3      | UI 스타일링                 |
+| **TensorFlow.js** | ^4.x (예정) | 필기 숫자 인식 (speed-math) |
 
 ---
 
@@ -65,10 +66,18 @@ BrainTouch/
 │   │   ├── GameCard.tsx            # 게임 카드 컴포넌트
 │   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
 │   └── games/
-│       └── brain-touch/            # Brain Touch 게임
+│       ├── brain-touch/            # Brain Touch 게임
+│       │   ├── config.ts           # Phaser 설정
+│       │   └── scenes/
+│       │       └── MainScene.ts    # 메인 게임 씬
+│       └── speed-math/             # Speed Math 게임 (사칙연산)
+│           ├── DESIGN.md           # 게임 설계 문서
 │           ├── config.ts           # Phaser 설정
-│           └── scenes/
-│               └── MainScene.ts    # 메인 게임 씬
+│           ├── scenes/
+│           │   ├── GameScene.ts    # 메인 게임 씬
+│           │   └── ResultScene.ts  # 결과 화면
+│           └── utils/
+│               └── QuestionGenerator.ts  # 문제 생성기
 ├── public/                         # 정적 에셋
 │   └── assets/                     # 이미지, 오디오, 폰트
 ├── index.html                      # HTML 템플릿
@@ -87,22 +96,36 @@ BrainTouch/
 ## 📄 주요 파일 설명
 
 ### `src/main.tsx`
+
 - React 앱 진입점
 - BrowserRouter 래핑
 
 ### `src/App.tsx`
+
 - React Router 설정
 - 페이지 라우팅: `/`, `/game/:gameId`, `/ranking`
 
 ### `src/components/PhaserGame.tsx`
+
 - Phaser 게임을 React 컴포넌트로 래핑
 - 게임별 설정을 동적 import
 - 리사이즈 핸들링
 
 ### `src/games/brain-touch/`
+
 - Brain Touch 게임 코드
 - `config.ts`: Phaser 설정 생성 함수
 - `scenes/MainScene.ts`: 게임 로직 (터치 게임)
+
+### `src/games/speed-math/`
+
+- Speed Math 게임 (스피드 계산 - 사칙연산 스피드 퀴즈)
+- `DESIGN.md`: 게임 설계 문서 (아키텍처, 규칙, 기술 스택)
+- `config.ts`: Phaser 게임 설정
+- `scenes/GameScene.ts`: 메인 게임 씬 (숫자패드, 타이머, 정답 처리)
+- `scenes/ResultScene.ts`: 결과 화면
+- `utils/QuestionGenerator.ts`: 20문제 생성기 (+, -, ×)
+- 상세 내용은 `src/games/speed-math/DESIGN.md` 참조
 
 ---
 
@@ -121,6 +144,7 @@ npm run preview  # 빌드 결과물 미리보기
 > 상세 내용은 `CONVENTION.md` 참조
 
 ### 브랜치
+
 ```
 feature/<game-name>-<description>
 fix/<game-name>-<description>
@@ -128,6 +152,7 @@ refactor/<game-name>-<description>
 ```
 
 ### 커밋
+
 ```
 <type>(<scope>): <subject>
 
@@ -139,6 +164,7 @@ refactor/<game-name>-<description>
 ## 📊 현재 진행 상황
 
 ### ✅ 완료
+
 - [x] 프로젝트 초기 환경 구축 (Vite + TS + Phaser3)
 - [x] React + Phaser 하이브리드 아키텍처로 마이그레이션
 - [x] TailwindCSS 설정
@@ -148,7 +174,13 @@ refactor/<game-name>-<description>
 - [x] 개발 컨벤션 문서 작성
 - [x] GitHub 리포지토리 연결
 
+### 🔄 진행중
+
+- [x] Speed Math 게임 MVP 구현 완료 (숫자패드 모드)
+- [ ] Speed Math 필기 인식 모드 (TensorFlow.js)
+
 ### 🔲 예정
+
 - [ ] 게임 UI/UX 개선
 - [ ] 에셋 추가 (이미지, 사운드)
 - [ ] 점수 저장 시스템
@@ -178,11 +210,14 @@ refactor/<game-name>-<description>
 
 ## 📝 최근 변경 이력
 
-| 날짜 | 작업 내용 |
-|------|-----------|
-| 2025-12-14 | React + Phaser 하이브리드 구조로 마이그레이션 |
-| 2025-12-14 | 프로젝트 초기 환경 구축, 컨벤션 문서 작성 |
+| 날짜       | 작업 내용                                         |
+| ---------- | ------------------------------------------------- |
+| 2025-12-14 | Speed Math UI 개선 (3-2-1 카운트다운, 3문제 표시) |
+| 2025-12-14 | Speed Math MVP 구현 (숫자패드, 타이머, 결과화면)  |
+| 2025-12-14 | Speed Math 게임 설계 문서 작성 (DESIGN.md)        |
+| 2025-12-14 | React + Phaser 하이브리드 구조로 마이그레이션     |
+| 2025-12-14 | 프로젝트 초기 환경 구축, 컨벤션 문서 작성         |
 
 ---
 
-*마지막 업데이트: 2025-12-14*
+_마지막 업데이트: 2025-12-14_
