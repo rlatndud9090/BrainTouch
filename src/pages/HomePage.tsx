@@ -15,6 +15,12 @@ const games = [
     description: '20문제 사칙연산을 최대한 빠르게!',
     color: 'from-green-500 to-teal-500',
   },
+  {
+    id: 'math-flight',
+    title: '🚀 매스 플라이트',
+    description: '운석을 피하며 파워를 모아라!',
+    color: 'from-cyan-500 to-blue-500',
+  },
 ];
 
 export default function HomePage() {

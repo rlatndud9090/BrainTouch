@@ -87,6 +87,7 @@ BrainTouch/
 ├── tailwind.config.js              # TailwindCSS 설정
 ├── postcss.config.js               # PostCSS 설정
 ├── CONVENTION.md                   # 브랜치/커밋 컨벤션
+├── GAME_IDEAS.md                   # 게임 아이디어 백로그
 ├── README.md                       # 프로젝트 문서
 └── CLAUDE.md                       # 이 파일 (AI 컨텍스트)
 ```
@@ -181,6 +182,9 @@ refactor/<game-name>-<description>
 
 ### 🔲 예정
 
+> 상세 아이디어는 `GAME_IDEAS.md` 참조
+
+- [ ] **블록셈** 게임 개발 (다음 개발 예정)
 - [ ] 게임 UI/UX 개선
 - [ ] 에셋 추가 (이미지, 사운드)
 - [ ] 점수 저장 시스템
@@ -212,6 +216,7 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                         |
 | ---------- | ------------------------------------------------- |
+| 2025-12-14 | GAME_IDEAS.md 생성 (게임 아이디어 백로그)         |
 | 2025-12-14 | Speed Math UI 개선 (3-2-1 카운트다운, 3문제 표시) |
 | 2025-12-14 | Speed Math MVP 구현 (숫자패드, 타이머, 결과화면)  |
 | 2025-12-14 | Speed Math 게임 설계 문서 작성 (DESIGN.md)        |
