@@ -13,14 +13,12 @@ const COLORS = {
 interface ResultData {
   totalScore: number;
   survivalTime: number;
-  maxPower: number;
   turnCount: number;
 }
 
 export class ResultScene extends Phaser.Scene {
   private totalScore = 0;
   private survivalTime = 0;
-  private maxPower = 0;
   private turnCount = 0;
 
   constructor() {
@@ -30,7 +28,6 @@ export class ResultScene extends Phaser.Scene {
   init(data: ResultData): void {
     this.totalScore = data.totalScore || 0;
     this.survivalTime = data.survivalTime || 0;
-    this.maxPower = data.maxPower || 0;
     this.turnCount = data.turnCount || 0;
   }
 
@@ -78,16 +75,15 @@ export class ResultScene extends Phaser.Scene {
 
     // 상세 정보
     const infoY = height * 0.48;
-    const infoGap = 35;
+    const infoGap = 40;
 
     this.createInfoRow(width / 2, infoY, '생존 시간', this.formatTime(this.survivalTime));
-    this.createInfoRow(width / 2, infoY + infoGap, '최고 파워', `${this.maxPower}`);
-    this.createInfoRow(width / 2, infoY + infoGap * 2, '클리어 턴', `${this.turnCount}`);
+    this.createInfoRow(width / 2, infoY + infoGap, '클리어 턴', `${this.turnCount}`);
 
     // 버튼들
     this.createButton(
       width / 2,
-      height * 0.72,
+      height * 0.7,
       '다시 도전',
       () => {
         this.scene.start('GameScene');
@@ -97,13 +93,12 @@ export class ResultScene extends Phaser.Scene {
 
     this.createButton(
       width / 2,
-      height * 0.84,
+      height * 0.82,
       '홈으로',
       () => {
         this.game.events.emit('gameOver', {
           totalScore: this.totalScore,
           survivalTime: this.survivalTime,
-          maxPower: this.maxPower,
           turnCount: this.turnCount,
         });
       },

@@ -1,18 +1,66 @@
 /**
- * 운석 생성 알고리즘
- * - 현재 파워를 기준으로 5개 운석 생성
- * - 성공 운석 3개 + 실패 운석 2개 (기본)
- * - 난이도 조정에 따라 비율 변경
+ * Math Flight - 운석 생성 알고리즘
+ *
+ * 규칙:
+ * - 5개 운석이 동시에 떨어짐
+ * - 가장 큰 수 / 가장 작은 수 → 실패 (라이프 -1)
+ * - 중간 3개 → 성공 (점수 획득)
+ * - 정확히 중간값 → 2배 점수
  */
+
+export type MeteorType = 'min' | 'max' | 'success' | 'median';
 
 export interface MeteorData {
   value: number;
   lane: number;
-  isOptimal: boolean;
+  type: MeteorType;
+}
+
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+// 난이도별 설정
+interface DifficultyConfig {
+  successRange: { min: number; max: number }; // 성공 운석 범위 (±)
+  failRange: { min: number; max: number }; // 실패 운석 범위 (±)
+  speedMultiplier: number;
+}
+
+const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
+  easy: {
+    successRange: { min: 5, max: 8 },
+    failRange: { min: 10, max: 15 },
+    speedMultiplier: 1.0,
+  },
+  medium: {
+    successRange: { min: 4, max: 7 },
+    failRange: { min: 7, max: 11 },
+    speedMultiplier: 1.3,
+  },
+  hard: {
+    successRange: { min: 3, max: 5 },
+    failRange: { min: 4, max: 8 },
+    speedMultiplier: 1.6,
+  },
+};
+
+/**
+ * 턴 수에 따른 난이도 결정
+ */
+export function getDifficulty(turnCount: number): Difficulty {
+  if (turnCount <= 10) return 'easy';
+  if (turnCount <= 25) return 'medium';
+  return 'hard';
 }
 
 /**
- * 랜덤 정수 생성 (min 이상 max 이하)
+ * 난이도별 속도 배수 반환
+ */
+export function getSpeedMultiplier(difficulty: Difficulty): number {
+  return DIFFICULTY_CONFIG[difficulty].speedMultiplier;
+}
+
+/**
+ * min ~ max 사이 랜덤 정수
  */
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -31,128 +79,69 @@ function shuffle<T>(array: T[]): T[] {
 }
 
 /**
- * 일반 운석 5개 생성
+ * 5개 운석 생성 (새로운 규칙)
+ *
+ * @param difficulty 현재 난이도
+ * @returns 5개 운석 데이터 (랜덤 레인 배치)
  */
-export function generateMeteors(
-  power: number,
-  successCount: number = 3,
-  failCount: number = 2
-): MeteorData[] {
-  const meteors: MeteorData[] = [];
-  const usedLanes: Set<number> = new Set();
+export function generateMeteors(difficulty: Difficulty): MeteorData[] {
+  const config = DIFFICULTY_CONFIG[difficulty];
 
-  // 성공 운석 생성 (power 이하)
-  const successValues: number[] = [];
-  for (let i = 0; i < successCount; i++) {
-    // 파워의 20% ~ 100% 범위에서 생성
-    const minVal = Math.max(1, Math.floor(power * 0.2));
-    const maxVal = power;
-    let value = randomInt(minVal, maxVal);
+  // 1. 중간값 결정 (10~40 범위, 경계 여유)
+  const medianValue = randomInt(12, 38);
 
-    // 중복 방지
-    while (successValues.includes(value)) {
-      value = randomInt(minVal, maxVal);
-    }
-    successValues.push(value);
-  }
+  // 2. 성공 범위 숫자 2개 (중간값 ± successRange)
+  const successOffset1 = randomInt(config.successRange.min, config.successRange.max);
+  const successOffset2 = randomInt(config.successRange.min, config.successRange.max);
 
-  // 정답 찾기 (가장 큰 성공 운석)
-  const optimalValue = Math.max(...successValues);
+  // 3. 실패 범위 숫자 2개 (중간값 ± failRange)
+  const failOffset1 = randomInt(config.failRange.min, config.failRange.max);
+  const failOffset2 = randomInt(config.failRange.min, config.failRange.max);
 
-  // 실패 운석 생성 (power 초과)
-  const failValues: number[] = [];
-  for (let i = 0; i < failCount; i++) {
-    // 파워의 101% ~ 150% 범위에서 생성
-    const minVal = power + 1;
-    const maxVal = Math.floor(power * 1.5) + 5;
-    let value = randomInt(minVal, maxVal);
+  // 4. 실제 값 계산 (0~50 범위 내로 클램핑)
+  const clamp = (v: number) => Math.max(0, Math.min(50, v));
 
-    // 중복 방지
-    while (failValues.includes(value)) {
-      value = randomInt(minVal, maxVal);
-    }
-    failValues.push(value);
-  }
+  const values = [
+    { value: clamp(medianValue - failOffset1), type: 'min' as MeteorType }, // 가장 작은 (실패)
+    { value: clamp(medianValue - successOffset1), type: 'success' as MeteorType }, // 성공
+    { value: medianValue, type: 'median' as MeteorType }, // 중간값 (2배)
+    { value: clamp(medianValue + successOffset2), type: 'success' as MeteorType }, // 성공
+    { value: clamp(medianValue + failOffset2), type: 'max' as MeteorType }, // 가장 큰 (실패)
+  ];
 
-  // 모든 값을 합쳐서 레인에 배치
-  const allValues = [...successValues, ...failValues];
+  // 5. 정렬 후 타입 재지정 (실제 최소/최대 확인)
+  const sorted = [...values].sort((a, b) => a.value - b.value);
+
+  // 실제 최소값과 최대값에 타입 지정
+  sorted[0].type = 'min';
+  sorted[4].type = 'max';
+  sorted[2].type = 'median';
+  sorted[1].type = 'success';
+  sorted[3].type = 'success';
+
+  // 6. 레인 셔플 (0~4)
   const lanes = shuffle([0, 1, 2, 3, 4]);
 
-  for (let i = 0; i < 5; i++) {
-    meteors.push({
-      value: allValues[i],
-      lane: lanes[i],
-      isOptimal: allValues[i] === optimalValue,
-    });
-  }
+  // 7. 최종 운석 데이터 생성
+  const meteors: MeteorData[] = sorted.map((item, index) => ({
+    value: item.value,
+    lane: lanes[index],
+    type: item.type,
+  }));
 
   return meteors;
 }
 
 /**
- * 마이너스 운석 5개 생성
+ * 운석이 성공인지 확인
  */
-export function generateMinusMeteors(power: number): MeteorData[] {
-  const meteors: MeteorData[] = [];
-  const values: number[] = [];
-
-  // 음수 운석 생성 (-1 ~ -파워의 30%)
-  for (let i = 0; i < 5; i++) {
-    const minAbs = 1;
-    const maxAbs = Math.max(5, Math.floor(power * 0.3));
-    let value = -randomInt(minAbs, maxAbs);
-
-    // 중복 방지
-    while (values.includes(value)) {
-      value = -randomInt(minAbs, maxAbs);
-    }
-    values.push(value);
-  }
-
-  // 정답 찾기 (절대값이 가장 작은 것 = 가장 큰 음수)
-  const optimalValue = Math.max(...values);
-
-  const lanes = shuffle([0, 1, 2, 3, 4]);
-
-  for (let i = 0; i < 5; i++) {
-    meteors.push({
-      value: values[i],
-      lane: lanes[i],
-      isOptimal: values[i] === optimalValue,
-    });
-  }
-
-  return meteors;
+export function isSuccessMeteor(type: MeteorType): boolean {
+  return type === 'success' || type === 'median';
 }
 
 /**
- * 난이도에 따른 운석 구성 결정
+ * 운석이 중간값인지 확인 (2배 점수)
  */
-export function getMeteorConfig(
-  consecutiveOptimal: number,
-  consecutiveFail: number
-): {
-  successCount: number;
-  failCount: number;
-} {
-  // 연속 실패 시 구제
-  if (consecutiveFail >= 2) {
-    return { successCount: 4, failCount: 1 };
-  }
-
-  // 기본 구성
-  return { successCount: 3, failCount: 2 };
-}
-
-/**
- * 마이너스 턴 발동 조건 체크
- */
-export function shouldTriggerMinusTurn(power: number, turnCount: number): boolean {
-  // 파워 99 도달 시 강제 발동
-  if (power >= 99) return true;
-
-  // 파워 50 이상, 5턴마다 발동
-  if (power >= 50 && turnCount > 0 && turnCount % 5 === 0) return true;
-
-  return false;
+export function isMedianMeteor(type: MeteorType): boolean {
+  return type === 'median';
 }

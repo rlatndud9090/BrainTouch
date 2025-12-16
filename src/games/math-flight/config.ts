@@ -5,7 +5,6 @@ import { ResultScene } from './scenes/ResultScene';
 export interface GameResult {
   totalScore: number;
   survivalTime: number;
-  maxPower: number;
   turnCount: number;
 }
 

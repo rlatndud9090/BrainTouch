@@ -1,23 +1,26 @@
 import Phaser from 'phaser';
 import {
   MeteorData,
+  MeteorType,
+  Difficulty,
   generateMeteors,
-  generateMinusMeteors,
-  getMeteorConfig,
-  shouldTriggerMinusTurn,
+  getDifficulty,
+  getSpeedMultiplier,
+  isSuccessMeteor,
+  isMedianMeteor,
 } from '../utils/MeteorGenerator';
 
 // 색상 상수
 const COLORS = {
   BG_SPACE: 0x0a0a1a,
-  METEOR_SUCCESS: 0x4ecca3,
-  METEOR_DANGER: 0xe94560,
-  METEOR_MINUS: 0x9b59b6,
-  POWER_TEXT: '#ffc947',
+  METEOR_NORMAL: 0x4a6fa5,
   PLAYER: 0x00d4ff,
   TEXT_PRIMARY: '#ffffff',
   TEXT_SECONDARY: '#a0a0a0',
   LANE_LINE: 0x1a1a3a,
+  SUCCESS_FLASH: 0x4ecca3,
+  FAIL_FLASH: 0xe94560,
+  MEDIAN_FLASH: 0xffc947,
 };
 
 // 레인 X 좌표 비율
@@ -32,28 +35,23 @@ interface MeteorSprite {
 
 export class GameScene extends Phaser.Scene {
   // 게임 상태
-  private power = 10;
   private score = 0;
   private lives = 3;
-  private playerX = 0; // 플레이어 X 좌표 (자유 이동)
   private turnCount = 0;
-  private consecutiveOptimal = 0;
-  private consecutiveFail = 0;
-  private isMinusTurn = false;
+  private playerX = 0;
   private startTime = 0;
-  private maxPower = 10;
   private isPlaying = false;
-  private hasCollidedThisWave = false; // 이번 웨이브에서 충돌했는지
+  private hasCollidedThisWave = false;
+  private currentDifficulty: Difficulty = 'easy';
 
   // UI 요소
   private livesText!: Phaser.GameObjects.Text;
-  private powerText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
   private player!: Phaser.GameObjects.Container;
 
   // 운석
   private meteors: MeteorSprite[] = [];
-  private meteorSpeed = 0; // 픽셀/ms
+  private baseSpeed = 0;
 
   // 레이아웃
   private laneXPositions: number[] = [];
@@ -99,19 +97,15 @@ export class GameScene extends Phaser.Scene {
     this.laneXPositions = LANE_POSITIONS.map((ratio) => width * ratio);
     this.playerY = height * 0.85;
     this.meteorStartY = -50;
-    this.meteorSpeed = height / 3000; // 3초에 화면 통과
+    this.baseSpeed = height / 3000; // 3초에 화면 통과 (기본)
   }
 
   private resetGameState(): void {
-    this.power = 10;
     this.score = 0;
     this.lives = 3;
-    this.playerX = this.scale.width / 2; // 화면 중앙에서 시작
     this.turnCount = 0;
-    this.consecutiveOptimal = 0;
-    this.consecutiveFail = 0;
-    this.isMinusTurn = false;
-    this.maxPower = 10;
+    this.playerX = this.scale.width / 2;
+    this.currentDifficulty = 'easy';
     this.isPlaying = false;
     this.hasCollidedThisWave = false;
     this.meteors = [];
@@ -120,7 +114,7 @@ export class GameScene extends Phaser.Scene {
   private createBackground(width: number, height: number): void {
     this.add.rectangle(0, 0, width, height, COLORS.BG_SPACE).setOrigin(0, 0);
 
-    // 별 효과 (간단한 파티클)
+    // 별 효과
     for (let i = 0; i < 50; i++) {
       const x = Math.random() * width;
       const y = Math.random() * height;
@@ -134,7 +128,6 @@ export class GameScene extends Phaser.Scene {
     const graphics = this.add.graphics();
     graphics.lineStyle(1, COLORS.LANE_LINE, 0.3);
 
-    // 레인 사이 구분선
     for (let i = 1; i < 5; i++) {
       const x = width * ((LANE_POSITIONS[i - 1] + LANE_POSITIONS[i]) / 2);
       graphics.lineBetween(x, 60, x, height - 50);
@@ -142,6 +135,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHUD(width: number): void {
+    // 점수 (좌상단)
+    this.scoreText = this.add
+      .text(16, 16, '0점', {
+        fontSize: '24px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.TEXT_PRIMARY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0, 0);
+
     // 라이프 (우상단)
     this.livesText = this.add
       .text(width - 16, 16, '❤️❤️❤️', {
@@ -149,26 +152,6 @@ export class GameScene extends Phaser.Scene {
         fontFamily: 'Pretendard, sans-serif',
       })
       .setOrigin(1, 0);
-
-    // 점수 (좌상단)
-    this.scoreText = this.add
-      .text(16, 16, '0점', {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0, 0);
-
-    // 파워 (캐릭터 상단에서 따라다님)
-    this.powerText = this.add
-      .text(this.playerX, this.playerY - 50, '10', {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.POWER_TEXT,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 1);
   }
 
   private createPlayer(): void {
@@ -193,16 +176,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupInput(): void {
-    // 씬 전체를 인터랙티브 영역으로 설정
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying) return;
       this.movePlayerToX(pointer.x);
     });
 
-    // 드래그 중 이동 (pointer.isDown 체크 없이 항상)
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying) return;
-      // primaryDown: 터치 또는 마우스 좌클릭 중인지
       if (pointer.primaryDown) {
         this.movePlayerToX(pointer.x);
       }
@@ -211,14 +191,9 @@ export class GameScene extends Phaser.Scene {
 
   private movePlayerToX(x: number): void {
     const { width } = this.scale;
-    // 화면 경계 내로 제한 (좌우 여백 30px)
     const clampedX = Phaser.Math.Clamp(x, 30, width - 30);
-
     this.playerX = clampedX;
-
-    // 플레이어와 파워 텍스트 즉시 이동 (드래그 느낌)
     this.player.x = clampedX;
-    this.powerText.x = clampedX;
   }
 
   private startCountdown(): void {
@@ -274,21 +249,14 @@ export class GameScene extends Phaser.Scene {
   private spawnMeteorWave(): void {
     if (!this.isPlaying) return;
 
-    // 새 웨이브 시작 - 충돌 플래그 리셋
+    // 충돌 플래그 리셋
     this.hasCollidedThisWave = false;
 
-    // 마이너스 턴 체크
-    this.isMinusTurn = shouldTriggerMinusTurn(this.power, this.turnCount);
+    // 난이도 업데이트
+    this.currentDifficulty = getDifficulty(this.turnCount);
 
     // 운석 생성
-    let meteorData: MeteorData[];
-    if (this.isMinusTurn) {
-      meteorData = generateMinusMeteors(this.power);
-      this.showMinusTurnWarning();
-    } else {
-      const config = getMeteorConfig(this.consecutiveOptimal, this.consecutiveFail);
-      meteorData = generateMeteors(this.power, config.successCount, config.failCount);
-    }
+    const meteorData = generateMeteors(this.currentDifficulty);
 
     // 운석 스프라이트 생성
     meteorData.forEach((data) => {
@@ -305,11 +273,8 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(x, y);
 
-    // 운석 색상 통일 (마이너스 턴만 다르게)
-    const color = this.isMinusTurn ? COLORS.METEOR_MINUS : 0x4a6fa5;
-
-    // 운석 배경
-    const bg = this.add.circle(0, 0, 30, color);
+    // 운석 배경 (모두 동일 색상)
+    const bg = this.add.circle(0, 0, 30, COLORS.METEOR_NORMAL);
 
     // 숫자 텍스트
     const text = this.add
@@ -330,33 +295,10 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
-  private showMinusTurnWarning(): void {
-    const { width, height } = this.scale;
-
-    const warning = this.add
-      .text(width / 2, height / 2, '⚠️ 마이너스 턴!', {
-        fontSize: '32px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#9b59b6',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-
-    this.tweens.add({
-      targets: warning,
-      alpha: 1,
-      duration: 200,
-      yoyo: true,
-      hold: 500,
-      onComplete: () => warning.destroy(),
-    });
-  }
-
   update(_time: number, delta: number): void {
     if (!this.isPlaying) return;
 
-    // 운석 이동
+    // 운석 이동 (난이도별 속도)
     this.updateMeteors(delta);
 
     // 충돌 체크
@@ -368,12 +310,14 @@ export class GameScene extends Phaser.Scene {
 
   private updateMeteors(delta: number): void {
     const { height } = this.scale;
+    const speedMultiplier = getSpeedMultiplier(this.currentDifficulty);
+    const currentSpeed = this.baseSpeed * speedMultiplier;
 
     this.meteors.forEach((meteor) => {
-      meteor.y += this.meteorSpeed * delta;
+      meteor.y += currentSpeed * delta;
       meteor.container.y = meteor.y;
 
-      // 화면 밖으로 나간 운석 제거 (놓친 경우)
+      // 화면 밖으로 나간 운석 제거
       if (meteor.y > height + 50) {
         meteor.container.destroy();
       }
@@ -384,117 +328,93 @@ export class GameScene extends Phaser.Scene {
   }
 
   private checkCollisions(): void {
-    // 이번 웨이브에서 이미 충돌했으면 스킵
     if (this.hasCollidedThisWave) return;
 
-    const collisionRadius = 35; // 충돌 반경 (플레이어 + 운석)
+    const collisionRadius = 35;
 
     for (let i = this.meteors.length - 1; i >= 0; i--) {
       const meteor = this.meteors[i];
       const meteorX = this.laneXPositions[meteor.data.lane];
 
-      // 거리 기반 충돌 체크
       const dx = this.playerX - meteorX;
       const dy = this.playerY - meteor.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance < collisionRadius) {
-        this.hasCollidedThisWave = true; // 충돌 플래그 설정
+        this.hasCollidedThisWave = true;
         this.handleCollision(meteor);
         meteor.container.destroy();
         this.meteors.splice(i, 1);
-        break; // 한 번에 하나만 처리
+        break;
       }
     }
   }
 
   private handleCollision(meteor: MeteorSprite): void {
-    const { value, isOptimal } = meteor.data;
+    const { type } = meteor.data;
 
-    if (this.isMinusTurn) {
-      // 마이너스 턴: 무조건 파워 감소
-      this.power += value; // value는 음수
-      this.power = Math.max(1, this.power); // 최소 1 유지
+    if (isSuccessMeteor(type)) {
+      // 성공!
+      const baseScore = 100;
+      const multiplier = isMedianMeteor(type) ? 2 : 1;
+      const earnedScore = baseScore * multiplier;
 
-      // 점수 계산 (절대값 작을수록 보너스)
-      const baseScore = Math.abs(value) * 10;
-      const bonus = isOptimal ? 2 : 1;
-      this.score += baseScore * bonus;
-
-      this.showPowerChange(value);
-
-      if (isOptimal) {
-        this.consecutiveOptimal++;
-        this.consecutiveFail = 0;
-      } else {
-        this.consecutiveOptimal = 0;
-      }
+      this.score += earnedScore;
+      this.showSuccessEffect(meteor, earnedScore, isMedianMeteor(type));
     } else {
-      // 일반 턴
-      if (value <= this.power) {
-        // 성공: 파워 증가
-        this.power += value;
-        this.power = Math.min(99, this.power);
-        this.maxPower = Math.max(this.maxPower, this.power);
+      // 실패 (min 또는 max)
+      this.lives--;
+      this.showFailEffect();
 
-        // 점수 계산
-        const baseScore = value * 10;
-        const bonus = isOptimal ? 1.5 : 1;
-        this.score += Math.floor(baseScore * bonus);
-
-        this.showPowerChange(value);
-
-        if (isOptimal) {
-          this.consecutiveOptimal++;
-          this.consecutiveFail = 0;
-        } else {
-          this.consecutiveOptimal = 0;
-        }
-      } else {
-        // 실패: 라이프 감소
-        this.lives--;
-        this.consecutiveOptimal = 0;
-        this.consecutiveFail++;
-
-        this.showDamageEffect();
-
-        if (this.lives <= 0) {
-          this.endGame();
-          return;
-        }
+      if (this.lives <= 0) {
+        this.endGame();
+        return;
       }
     }
 
     this.updateHUD();
   }
 
-  private showPowerChange(value: number): void {
-    const sign = value > 0 ? '+' : '';
-    const color = value > 0 ? '#4ecca3' : '#9b59b6';
+  private showSuccessEffect(meteor: MeteorSprite, score: number, isMedian: boolean): void {
+    const color = isMedian ? COLORS.MEDIAN_FLASH : COLORS.SUCCESS_FLASH;
+    const text = isMedian ? `+${score} x2!` : `+${score}`;
 
+    // 점수 팝업
     const popup = this.add
-      .text(this.player.x, this.player.y - 50, `${sign}${value}`, {
+      .text(meteor.container.x, meteor.container.y, text, {
         fontSize: '24px',
         fontFamily: 'Pretendard, sans-serif',
-        color,
+        color: isMedian ? '#ffc947' : '#4ecca3',
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
     this.tweens.add({
       targets: popup,
-      y: popup.y - 30,
+      y: popup.y - 40,
       alpha: 0,
       duration: 800,
       ease: 'Power2',
       onComplete: () => popup.destroy(),
     });
+
+    // 플래시 효과
+    const { width, height } = this.scale;
+    const flash = this.add.rectangle(0, 0, width, height, color, 0.2).setOrigin(0, 0);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => flash.destroy(),
+    });
   }
 
-  private showDamageEffect(): void {
-    // 화면 빨간색 플래시
+  private showFailEffect(): void {
     const { width, height } = this.scale;
-    const flash = this.add.rectangle(0, 0, width, height, 0xe94560, 0.3).setOrigin(0, 0);
+
+    // 화면 빨간색 플래시
+    const flash = this.add.rectangle(0, 0, width, height, COLORS.FAIL_FLASH, 0.3).setOrigin(0, 0);
 
     this.tweens.add({
       targets: flash,
@@ -511,30 +431,30 @@ export class GameScene extends Phaser.Scene {
       yoyo: true,
       repeat: 3,
     });
+
+    // 화면 흔들림
+    this.cameras.main.shake(200, 0.01);
   }
 
   private updateHUD(): void {
-    // 라이프
     this.livesText.setText('❤️'.repeat(this.lives) + '🖤'.repeat(3 - this.lives));
-
-    // 파워 (숫자만)
-    this.powerText.setText(`${this.power}`);
-
-    // 점수
     this.scoreText.setText(`${this.score}점`);
   }
 
   private checkNextWave(): void {
-    // 모든 운석이 화면 중간을 넘었으면 다음 웨이브
     const midY = this.scale.height * 0.5;
     const allPassed = this.meteors.every((m) => m.y > midY);
 
     if (allPassed && this.meteors.length > 0) {
-      // 이미 다음 웨이브가 있으면 스킵
       const hasUpcoming = this.meteors.some((m) => m.y < midY);
       if (!hasUpcoming) {
         this.spawnMeteorWave();
       }
+    }
+
+    // 모든 운석이 화면 밖으로 나갔으면 새 웨이브
+    if (this.meteors.length === 0) {
+      this.spawnMeteorWave();
     }
   }
 
@@ -546,7 +466,6 @@ export class GameScene extends Phaser.Scene {
     this.scene.start('ResultScene', {
       totalScore: this.score,
       survivalTime,
-      maxPower: this.maxPower,
       turnCount: this.turnCount,
     });
   }
@@ -555,16 +474,12 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
 
-    // UI 위치 업데이트
     this.livesText?.setPosition(width - 16, 16);
 
-    // 플레이어 위치를 화면 비율에 맞게 조정
     if (this.player) {
-      // 화면 경계 내로 재조정
       this.playerX = Phaser.Math.Clamp(this.playerX, 30, width - 30);
       this.player.x = this.playerX;
       this.player.y = this.playerY;
-      this.powerText?.setPosition(this.playerX, this.playerY - 50);
     }
   }
 }
