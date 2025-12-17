@@ -2,14 +2,21 @@
  * Speed Math - 필기 숫자 인식 (TensorFlow.js + MNIST)
  *
  * 0~9 숫자를 인식하는 CNN 모델 사용
+ * 단일/다중 숫자 인식 지원
  */
 
 import * as tf from '@tensorflow/tfjs';
 
 // 모델 URL (사전 학습된 MNIST 모델)
-// 공개된 MNIST 모델 사용 또는 직접 학습 후 호스팅 필요
 const MODEL_URL =
   'https://storage.googleapis.com/tfjs-models/tfjs/mnist_transfer_cnn_v1/model.json';
+
+export interface DigitBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
 
 export class DigitRecognizer {
   private model: tf.LayersModel | null = null;
@@ -28,14 +35,12 @@ export class DigitRecognizer {
     try {
       console.log('[DigitRecognizer] 모델 로딩 시작...');
 
-      // TensorFlow.js 백엔드 설정 (WebGL 우선)
       await tf.ready();
       console.log('[DigitRecognizer] TF 백엔드:', tf.getBackend());
 
-      // 모델 로드
       this.model = await tf.loadLayersModel(MODEL_URL);
 
-      // 워밍업 (첫 추론이 느리므로 미리 실행)
+      // 워밍업
       const dummyInput = tf.zeros([1, 28, 28, 1]);
       const warmup = this.model.predict(dummyInput) as tf.Tensor;
       warmup.dispose();
@@ -52,17 +57,12 @@ export class DigitRecognizer {
     }
   }
 
-  /**
-   * 모델 준비 상태 확인
-   */
   isModelReady(): boolean {
     return this.isReady;
   }
 
   /**
-   * Canvas 이미지에서 숫자 인식
-   * @param canvas HTMLCanvasElement 또는 ImageData
-   * @returns 인식된 숫자 (0~9) 또는 -1 (실패)
+   * 단일 숫자 인식
    */
   async predict(imageData: ImageData): Promise<number> {
     if (!this.model || !this.isReady) {
@@ -71,14 +71,10 @@ export class DigitRecognizer {
     }
 
     try {
-      // ImageData → Tensor 변환 및 전처리
       const tensor = this.preprocessImage(imageData);
-
-      // 추론
       const prediction = this.model.predict(tensor) as tf.Tensor;
       const probabilities = await prediction.data();
 
-      // 가장 높은 확률의 숫자 찾기
       let maxProb = 0;
       let maxIndex = 0;
       for (let i = 0; i < probabilities.length; i++) {
@@ -88,16 +84,12 @@ export class DigitRecognizer {
         }
       }
 
-      // 메모리 정리
       tensor.dispose();
       prediction.dispose();
 
-      console.log(
-        `[DigitRecognizer] 인식 결과: ${maxIndex} (확률: ${(maxProb * 100).toFixed(1)}%)`
-      );
+      console.log(`[DigitRecognizer] 인식: ${maxIndex} (${(maxProb * 100).toFixed(1)}%)`);
 
-      // 확률이 너무 낮으면 인식 실패로 처리
-      if (maxProb < 0.3) {
+      if (maxProb < 0.25) {
         return -1;
       }
 
@@ -109,77 +101,151 @@ export class DigitRecognizer {
   }
 
   /**
-   * 이미지 전처리 (28x28, 정규화, 반전)
+   * 캔버스에서 숫자들 인식 (1~2자리)
+   * 자동으로 분할하여 각 숫자 인식
    */
-  private preprocessImage(imageData: ImageData): tf.Tensor {
-    return tf.tidy(() => {
-      // ImageData → Tensor
-      let tensor = tf.browser.fromPixels(imageData, 1); // 그레이스케일
+  async predictFromCanvas(canvas: HTMLCanvasElement): Promise<string> {
+    const ctx = canvas.getContext('2d')!;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-      // 28x28로 리사이즈
-      tensor = tf.image.resizeBilinear(tensor, [28, 28]);
+    // 바운딩 박스 찾기
+    const bounds = this.findBoundingBox(imageData);
+    if (!bounds) {
+      return '';
+    }
 
-      // 정규화 (0~255 → 0~1)
-      tensor = tensor.div(255.0);
+    const { minX, maxX, minY, maxY } = bounds;
+    const width = maxX - minX + 1;
+    const height = maxY - minY + 1;
 
-      // 배치 차원 추가 [1, 28, 28, 1]
-      tensor = tensor.expandDims(0);
+    // 가로 세로 비율로 1자리 vs 2자리 판단
+    const aspectRatio = width / height;
+    console.log(`[DigitRecognizer] 비율: ${aspectRatio.toFixed(2)}, 크기: ${width}x${height}`);
 
-      return tensor;
-    });
+    if (aspectRatio > 1.2) {
+      // 2자리 숫자 - 분할
+      return await this.recognizeTwoDigits(canvas, bounds);
+    } else {
+      // 1자리 숫자
+      const digitData = this.extractSingleDigit(canvas, bounds);
+      const digit = await this.predict(digitData);
+      return digit >= 0 ? digit.toString() : '';
+    }
   }
 
   /**
-   * Canvas에서 ImageData 추출 (중앙 정렬 + 패딩)
+   * 2자리 숫자 분할 인식
    */
-  static extractImageData(canvas: HTMLCanvasElement): ImageData {
+  private async recognizeTwoDigits(
+    canvas: HTMLCanvasElement,
+    bounds: DigitBounds
+  ): Promise<string> {
+    const { minX, maxX, minY, maxY } = bounds;
+    const width = maxX - minX + 1;
+    const midX = minX + Math.floor(width / 2);
+
+    // 분할점 찾기 (세로 방향으로 빈 공간 찾기)
     const ctx = canvas.getContext('2d')!;
-    const width = canvas.width;
-    const height = canvas.height;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const splitX = this.findSplitPoint(imageData, minX, maxX, minY, maxY) || midX;
 
-    // 원본 이미지 데이터
-    const originalData = ctx.getImageData(0, 0, width, height);
+    // 왼쪽 숫자 (십의 자리)
+    const leftBounds: DigitBounds = { minX, minY, maxX: splitX - 1, maxY };
+    const leftData = this.extractSingleDigit(canvas, leftBounds);
+    const leftDigit = await this.predict(leftData);
 
-    // 바운딩 박스 찾기 (그려진 영역)
-    const bounds = this.findBoundingBox(originalData);
+    // 오른쪽 숫자 (일의 자리)
+    const rightBounds: DigitBounds = { minX: splitX, minY, maxX, maxY };
+    const rightData = this.extractSingleDigit(canvas, rightBounds);
+    const rightDigit = await this.predict(rightData);
 
-    if (!bounds) {
-      // 빈 캔버스면 빈 이미지 반환
-      return ctx.getImageData(0, 0, 28, 28);
+    if (leftDigit >= 0 && rightDigit >= 0) {
+      return `${leftDigit}${rightDigit}`;
+    } else if (leftDigit >= 0) {
+      return leftDigit.toString();
+    } else if (rightDigit >= 0) {
+      return rightDigit.toString();
+    }
+    return '';
+  }
+
+  /**
+   * 세로 방향으로 가장 빈 x 좌표 찾기 (분할점)
+   */
+  private findSplitPoint(
+    imageData: ImageData,
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number
+  ): number | null {
+    const { data, width } = imageData;
+    const centerRange = Math.floor((maxX - minX) * 0.3);
+    const searchStart = minX + Math.floor((maxX - minX) / 2) - centerRange;
+    const searchEnd = minX + Math.floor((maxX - minX) / 2) + centerRange;
+
+    let minPixels = Infinity;
+    let bestX = null;
+
+    for (let x = searchStart; x <= searchEnd; x++) {
+      let pixelCount = 0;
+      for (let y = minY; y <= maxY; y++) {
+        const idx = (y * width + x) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        if (brightness > 100) {
+          pixelCount++;
+        }
+      }
+      if (pixelCount < minPixels) {
+        minPixels = pixelCount;
+        bestX = x;
+      }
     }
 
-    // 그려진 영역 추출
+    return bestX;
+  }
+
+  /**
+   * 단일 숫자 추출 (개선된 버전 - 1 인식 향상)
+   */
+  private extractSingleDigit(canvas: HTMLCanvasElement, bounds: DigitBounds): ImageData {
     const { minX, minY, maxX, maxY } = bounds;
-    const cropWidth = maxX - minX + 1;
-    const cropHeight = maxY - minY + 1;
+    let cropWidth = maxX - minX + 1;
+    let cropHeight = maxY - minY + 1;
 
-    // 정사각형으로 만들기 (패딩 추가)
+    // 너무 얇으면 (1 같은 경우) 최소 너비 보장
+    const minWidth = cropHeight * 0.4; // 높이의 40% 이상
+    if (cropWidth < minWidth) {
+      const padding = Math.ceil((minWidth - cropWidth) / 2);
+      cropWidth = Math.ceil(minWidth);
+      // bounds 조정은 하지 않고 패딩으로 처리
+    }
+
+    // 정사각형으로 만들기
     const size = Math.max(cropWidth, cropHeight);
-    const paddedSize = Math.ceil(size * 1.3); // 20% 여백
+    const paddedSize = Math.ceil(size * 1.4); // 40% 여백 (1 인식 향상)
 
-    // 임시 캔버스에 중앙 정렬하여 그리기
+    // 임시 캔버스에 중앙 정렬
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = paddedSize;
     tempCanvas.height = paddedSize;
     const tempCtx = tempCanvas.getContext('2d')!;
 
-    // 검은 배경
     tempCtx.fillStyle = 'black';
     tempCtx.fillRect(0, 0, paddedSize, paddedSize);
 
-    // 중앙에 그리기
-    const offsetX = (paddedSize - cropWidth) / 2;
-    const offsetY = (paddedSize - cropHeight) / 2;
+    const offsetX = (paddedSize - (maxX - minX + 1)) / 2;
+    const offsetY = (paddedSize - (maxY - minY + 1)) / 2;
     tempCtx.drawImage(
       canvas,
       minX,
       minY,
-      cropWidth,
-      cropHeight,
+      maxX - minX + 1,
+      maxY - minY + 1,
       offsetX,
       offsetY,
-      cropWidth,
-      cropHeight
+      maxX - minX + 1,
+      maxY - minY + 1
     );
 
     // 28x28로 리사이즈
@@ -196,11 +262,22 @@ export class DigitRecognizer {
   }
 
   /**
-   * 그려진 영역의 바운딩 박스 찾기
+   * 이미지 전처리
    */
-  private static findBoundingBox(
-    imageData: ImageData
-  ): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  private preprocessImage(imageData: ImageData): tf.Tensor {
+    return tf.tidy(() => {
+      let tensor = tf.browser.fromPixels(imageData, 1);
+      tensor = tf.image.resizeBilinear(tensor, [28, 28]);
+      tensor = tensor.div(255.0);
+      tensor = tensor.expandDims(0);
+      return tensor;
+    });
+  }
+
+  /**
+   * 바운딩 박스 찾기
+   */
+  private findBoundingBox(imageData: ImageData): DigitBounds | null {
     const { data, width, height } = imageData;
     let minX = width,
       minY = height,
@@ -214,7 +291,6 @@ export class DigitRecognizer {
         const alpha = data[idx + 3];
         const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
 
-        // 픽셀이 그려져 있으면 (흰색 획)
         if (alpha > 100 && brightness > 100) {
           found = true;
           minX = Math.min(minX, x);
@@ -229,8 +305,93 @@ export class DigitRecognizer {
   }
 
   /**
-   * 메모리 정리
+   * [Legacy] 단일 캔버스에서 ImageData 추출
    */
+  static extractImageData(canvas: HTMLCanvasElement): ImageData {
+    const ctx = canvas.getContext('2d')!;
+    const width = canvas.width;
+    const height = canvas.height;
+    const originalData = ctx.getImageData(0, 0, width, height);
+    const bounds = DigitRecognizer.findBoundingBoxStatic(originalData);
+
+    if (!bounds) {
+      return ctx.getImageData(0, 0, 28, 28);
+    }
+
+    const { minX, minY, maxX, maxY } = bounds;
+    let cropWidth = maxX - minX + 1;
+    const cropHeight = maxY - minY + 1;
+
+    // 1 인식 향상: 최소 너비 보장
+    const minWidth = cropHeight * 0.4;
+    if (cropWidth < minWidth) {
+      cropWidth = Math.ceil(minWidth);
+    }
+
+    const size = Math.max(cropWidth, cropHeight);
+    const paddedSize = Math.ceil(size * 1.4);
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = paddedSize;
+    tempCanvas.height = paddedSize;
+    const tempCtx = tempCanvas.getContext('2d')!;
+
+    tempCtx.fillStyle = 'black';
+    tempCtx.fillRect(0, 0, paddedSize, paddedSize);
+
+    const offsetX = (paddedSize - (maxX - minX + 1)) / 2;
+    const offsetY = (paddedSize - cropHeight) / 2;
+    tempCtx.drawImage(
+      canvas,
+      minX,
+      minY,
+      maxX - minX + 1,
+      cropHeight,
+      offsetX,
+      offsetY,
+      maxX - minX + 1,
+      cropHeight
+    );
+
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = 28;
+    finalCanvas.height = 28;
+    const finalCtx = finalCanvas.getContext('2d')!;
+
+    finalCtx.fillStyle = 'black';
+    finalCtx.fillRect(0, 0, 28, 28);
+    finalCtx.drawImage(tempCanvas, 0, 0, 28, 28);
+
+    return finalCtx.getImageData(0, 0, 28, 28);
+  }
+
+  private static findBoundingBoxStatic(imageData: ImageData): DigitBounds | null {
+    const { data, width, height } = imageData;
+    let minX = width,
+      minY = height,
+      maxX = 0,
+      maxY = 0;
+    let found = false;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const alpha = data[idx + 3];
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+
+        if (alpha > 100 && brightness > 100) {
+          found = true;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+
+    return found ? { minX, minY, maxX, maxY } : null;
+  }
+
   dispose(): void {
     if (this.model) {
       this.model.dispose();
@@ -240,5 +401,4 @@ export class DigitRecognizer {
   }
 }
 
-// 싱글톤 인스턴스
 export const digitRecognizer = new DigitRecognizer();

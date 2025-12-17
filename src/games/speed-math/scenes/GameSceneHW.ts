@@ -1,13 +1,12 @@
 import Phaser from 'phaser';
 import { Question, generateQuestions, isSingleDigitAnswer } from '../utils/QuestionGenerator';
-import { digitRecognizer, DigitRecognizer } from '../utils/DigitRecognizer';
+import { digitRecognizer } from '../utils/DigitRecognizer';
 
 // 색상 상수
 const COLORS = {
   BG_PRIMARY: 0x1a1a2e,
   BG_SECONDARY: 0x16213e,
   CANVAS_BG: 0x2a2a4e,
-  CANVAS_STROKE: 0xffffff,
   TEXT_PRIMARY: '#ffffff',
   TEXT_SECONDARY: '#a0a0a0',
   TEXT_DIM: '#606080',
@@ -33,26 +32,20 @@ export class GameSceneHW extends Phaser.Scene {
   private nextQuestionText!: Phaser.GameObjects.Text;
   private nextNextQuestionText!: Phaser.GameObjects.Text;
 
-  // 필기 캔버스
+  // 필기 캔버스 (단일)
   private canvasContainer!: Phaser.GameObjects.Container;
-  private leftCanvas!: HTMLCanvasElement;
-  private rightCanvas!: HTMLCanvasElement;
-  private leftCtx!: CanvasRenderingContext2D;
-  private rightCtx!: CanvasRenderingContext2D;
+  private drawCanvas!: HTMLCanvasElement;
+  private drawCtx!: CanvasRenderingContext2D;
   private isDrawing = false;
-  private currentCanvas: 'left' | 'right' | null = null;
   private recognitionTimer: number | null = null;
-
-  // 입력 상태
-  private leftDigit = '';
-  private rightDigit = '';
 
   // 카운트다운
   private countdownText!: Phaser.GameObjects.Text;
 
   // 레이아웃 설정
   private readonly TOTAL_QUESTIONS = 20;
-  private canvasSize = 100;
+  private canvasWidth = 200;
+  private canvasHeight = 120;
 
   constructor() {
     super({ key: 'GameSceneHW' });
@@ -65,8 +58,6 @@ export class GameSceneHW extends Phaser.Scene {
     this.questions = generateQuestions(this.TOTAL_QUESTIONS);
     this.currentQuestionIndex = 0;
     this.currentInput = '';
-    this.leftDigit = '';
-    this.rightDigit = '';
 
     // 배경
     this.createBackground(width, height);
@@ -77,7 +68,7 @@ export class GameSceneHW extends Phaser.Scene {
     // 문제 영역
     this.createQuestionArea(width, height);
 
-    // 필기 캔버스
+    // 필기 캔버스 (단일)
     this.createHandwritingCanvas(width, height);
 
     // 문제 표시
@@ -90,7 +81,7 @@ export class GameSceneHW extends Phaser.Scene {
     this.timerText.setAlpha(0);
 
     // 캔버스 숨김
-    this.hideHTMLCanvases();
+    this.hideHTMLCanvas();
 
     // 카운트다운 시작
     this.startCountdown();
@@ -195,108 +186,73 @@ export class GameSceneHW extends Phaser.Scene {
     const canvasAreaTop = height * 0.4;
     const canvasAreaHeight = height - canvasAreaTop;
 
-    // 캔버스 크기 계산
-    this.canvasSize = Math.min((width - 80) / 2, canvasAreaHeight * 0.5, 120);
-    const gap = 20;
-    const totalWidth = this.canvasSize * 2 + gap;
-    const startX = (width - totalWidth) / 2;
+    // 캔버스 크기 계산 (가로로 넓게)
+    this.canvasWidth = Math.min(width * 0.85, 280);
+    this.canvasHeight = Math.min(canvasAreaHeight * 0.45, 140);
+    const centerX = width / 2;
     const centerY = canvasAreaTop + canvasAreaHeight * 0.35;
 
     this.canvasContainer = this.add.container(0, 0);
 
     // 라벨
-    const labelY = centerY - this.canvasSize / 2 - 25;
-    const leftLabel = this.add
-      .text(startX + this.canvasSize / 2, labelY, '십의 자리', {
+    const label = this.add
+      .text(centerX, centerY - this.canvasHeight / 2 - 20, '숫자를 써주세요', {
         fontSize: '14px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
       })
       .setOrigin(0.5);
 
-    const rightLabel = this.add
-      .text(startX + this.canvasSize + gap + this.canvasSize / 2, labelY, '일의 자리', {
-        fontSize: '14px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(0.5);
-
-    // Phaser 캔버스 배경 (시각적 표시용)
-    const leftBg = this.add
-      .rectangle(
-        startX + this.canvasSize / 2,
-        centerY,
-        this.canvasSize,
-        this.canvasSize,
-        COLORS.CANVAS_BG
-      )
+    // 캔버스 배경 (Phaser)
+    const canvasBg = this.add
+      .rectangle(centerX, centerY, this.canvasWidth, this.canvasHeight, COLORS.CANVAS_BG)
       .setStrokeStyle(2, 0x4a4a6e);
 
-    const rightBg = this.add
-      .rectangle(
-        startX + this.canvasSize + gap + this.canvasSize / 2,
-        centerY,
-        this.canvasSize,
-        this.canvasSize,
-        COLORS.CANVAS_BG
-      )
-      .setStrokeStyle(2, 0x4a4a6e);
+    // 중앙 점선 가이드 (두 자리 숫자 안내)
+    const guideLine = this.add.graphics();
+    guideLine.lineStyle(1, 0x4a4a6e, 0.5);
+    guideLine.setLineDash([5, 5]);
+    guideLine.lineBetween(
+      centerX,
+      centerY - this.canvasHeight / 2 + 10,
+      centerX,
+      centerY + this.canvasHeight / 2 - 10
+    );
 
     // 지우기 버튼
-    const clearBtnY = centerY + this.canvasSize / 2 + 40;
+    const clearBtnY = centerY + this.canvasHeight / 2 + 35;
     const clearBtn = this.createClearButton(width / 2, clearBtnY);
 
-    this.canvasContainer.add([leftLabel, rightLabel, leftBg, rightBg, clearBtn]);
+    this.canvasContainer.add([label, canvasBg, guideLine, clearBtn]);
 
-    // HTML Canvas 생성 (실제 필기용)
-    this.createHTMLCanvases(startX, centerY);
+    // HTML Canvas 생성
+    this.createHTMLCanvas(centerX, centerY);
   }
 
-  private createHTMLCanvases(startX: number, centerY: number): void {
+  private createHTMLCanvas(centerX: number, centerY: number): void {
     const gameCanvas = this.game.canvas;
     const rect = gameCanvas.getBoundingClientRect();
-    const gap = 20;
 
-    // 왼쪽 캔버스 (십의 자리)
-    this.leftCanvas = document.createElement('canvas');
-    this.leftCanvas.width = this.canvasSize;
-    this.leftCanvas.height = this.canvasSize;
-    this.leftCanvas.style.position = 'absolute';
-    this.leftCanvas.style.left = `${rect.left + startX}px`;
-    this.leftCanvas.style.top = `${rect.top + centerY - this.canvasSize / 2}px`;
-    this.leftCanvas.style.backgroundColor = 'transparent';
-    this.leftCanvas.style.touchAction = 'none';
-    this.leftCanvas.style.cursor = 'crosshair';
-    this.leftCanvas.style.display = 'none';
-    document.body.appendChild(this.leftCanvas);
-    this.leftCtx = this.leftCanvas.getContext('2d')!;
+    this.drawCanvas = document.createElement('canvas');
+    this.drawCanvas.width = this.canvasWidth;
+    this.drawCanvas.height = this.canvasHeight;
+    this.drawCanvas.style.position = 'absolute';
+    this.drawCanvas.style.left = `${rect.left + centerX - this.canvasWidth / 2}px`;
+    this.drawCanvas.style.top = `${rect.top + centerY - this.canvasHeight / 2}px`;
+    this.drawCanvas.style.backgroundColor = 'transparent';
+    this.drawCanvas.style.touchAction = 'none';
+    this.drawCanvas.style.cursor = 'crosshair';
+    this.drawCanvas.style.display = 'none';
+    document.body.appendChild(this.drawCanvas);
+    this.drawCtx = this.drawCanvas.getContext('2d')!;
 
-    // 오른쪽 캔버스 (일의 자리)
-    this.rightCanvas = document.createElement('canvas');
-    this.rightCanvas.width = this.canvasSize;
-    this.rightCanvas.height = this.canvasSize;
-    this.rightCanvas.style.position = 'absolute';
-    this.rightCanvas.style.left = `${rect.left + startX + this.canvasSize + gap}px`;
-    this.rightCanvas.style.top = `${rect.top + centerY - this.canvasSize / 2}px`;
-    this.rightCanvas.style.backgroundColor = 'transparent';
-    this.rightCanvas.style.touchAction = 'none';
-    this.rightCanvas.style.cursor = 'crosshair';
-    this.rightCanvas.style.display = 'none';
-    document.body.appendChild(this.rightCanvas);
-    this.rightCtx = this.rightCanvas.getContext('2d')!;
-
-    // 캔버스 초기화
-    this.clearCanvas('left');
-    this.clearCanvas('right');
-
-    // 이벤트 리스너 추가
-    this.setupCanvasEvents(this.leftCanvas, 'left');
-    this.setupCanvasEvents(this.rightCanvas, 'right');
+    this.clearCanvas();
+    this.setupCanvasEvents();
   }
 
-  private setupCanvasEvents(canvas: HTMLCanvasElement, side: 'left' | 'right'): void {
-    const ctx = side === 'left' ? this.leftCtx : this.rightCtx;
+  private setupCanvasEvents(): void {
+    const canvas = this.drawCanvas;
+    const ctx = this.drawCtx;
 
     const getPos = (e: MouseEvent | Touch) => {
       const rect = canvas.getBoundingClientRect();
@@ -310,7 +266,6 @@ export class GameSceneHW extends Phaser.Scene {
       if (!this.isPlaying) return;
       e.preventDefault();
       this.isDrawing = true;
-      this.currentCanvas = side;
 
       const pos = getPos(e instanceof MouseEvent ? e : e.touches[0]);
       ctx.beginPath();
@@ -324,13 +279,13 @@ export class GameSceneHW extends Phaser.Scene {
     };
 
     const draw = (e: MouseEvent | TouchEvent) => {
-      if (!this.isDrawing || this.currentCanvas !== side) return;
+      if (!this.isDrawing) return;
       e.preventDefault();
 
       const pos = getPos(e instanceof MouseEvent ? e : e.touches[0]);
       ctx.lineTo(pos.x, pos.y);
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = Math.max(this.canvasSize / 15, 6);
+      ctx.lineWidth = Math.max(this.canvasHeight / 12, 8);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
@@ -340,10 +295,10 @@ export class GameSceneHW extends Phaser.Scene {
       if (!this.isDrawing) return;
       this.isDrawing = false;
 
-      // 300ms 후 인식 시작
+      // 500ms 후 인식 시작
       this.recognitionTimer = window.setTimeout(() => {
-        this.recognizeDigit(side);
-      }, 300);
+        this.recognizeDigits();
+      }, 500);
     };
 
     // 마우스 이벤트
@@ -358,58 +313,34 @@ export class GameSceneHW extends Phaser.Scene {
     canvas.addEventListener('touchend', endDraw);
   }
 
-  private async recognizeDigit(side: 'left' | 'right'): Promise<void> {
-    const canvas = side === 'left' ? this.leftCanvas : this.rightCanvas;
-
+  private async recognizeDigits(): Promise<void> {
     // 캔버스가 비어있는지 확인
-    const ctx = side === 'left' ? this.leftCtx : this.rightCtx;
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const isEmpty = !imageData.data.some((v, i) => i % 4 === 3 && v > 0); // alpha 체크
+    const imageData = this.drawCtx.getImageData(
+      0,
+      0,
+      this.drawCanvas.width,
+      this.drawCanvas.height
+    );
+    const isEmpty = !imageData.data.some((v, i) => i % 4 === 3 && v > 0);
 
     if (isEmpty) {
-      if (side === 'left') this.leftDigit = '';
-      else this.rightDigit = '';
-      this.updateCurrentInput();
+      this.currentInput = '';
+      this.updateAnswerDisplay();
       return;
     }
 
-    // 인식
-    const processedData = DigitRecognizer.extractImageData(canvas);
-    const digit = await digitRecognizer.predict(processedData);
+    // 인식 (자동 분할)
+    const result = await digitRecognizer.predictFromCanvas(this.drawCanvas);
 
-    if (digit >= 0) {
-      if (side === 'left') {
-        this.leftDigit = digit.toString();
-      } else {
-        this.rightDigit = digit.toString();
-      }
-      this.updateCurrentInput();
+    if (result) {
+      this.currentInput = result;
+      this.updateAnswerDisplay();
       this.checkAnswer();
     }
   }
 
-  private updateCurrentInput(): void {
-    // 두 자리 숫자 조합
-    if (this.leftDigit && this.rightDigit) {
-      this.currentInput = this.leftDigit + this.rightDigit;
-    } else if (this.rightDigit) {
-      this.currentInput = this.rightDigit;
-    } else {
-      this.currentInput = '';
-    }
-
-    this.updateAnswerDisplay();
-  }
-
-  private clearCanvas(side: 'left' | 'right' | 'both'): void {
-    if (side === 'left' || side === 'both') {
-      this.leftCtx?.clearRect(0, 0, this.canvasSize, this.canvasSize);
-      this.leftDigit = '';
-    }
-    if (side === 'right' || side === 'both') {
-      this.rightCtx?.clearRect(0, 0, this.canvasSize, this.canvasSize);
-      this.rightDigit = '';
-    }
+  private clearCanvas(): void {
+    this.drawCtx?.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
     this.currentInput = '';
     this.updateAnswerDisplay();
   }
@@ -441,20 +372,18 @@ export class GameSceneHW extends Phaser.Scene {
         duration: 50,
         yoyo: true,
       });
-      this.clearCanvas('both');
+      this.clearCanvas();
     });
 
     return container;
   }
 
-  private showHTMLCanvases(): void {
-    if (this.leftCanvas) this.leftCanvas.style.display = 'block';
-    if (this.rightCanvas) this.rightCanvas.style.display = 'block';
+  private showHTMLCanvas(): void {
+    if (this.drawCanvas) this.drawCanvas.style.display = 'block';
   }
 
-  private hideHTMLCanvases(): void {
-    if (this.leftCanvas) this.leftCanvas.style.display = 'none';
-    if (this.rightCanvas) this.rightCanvas.style.display = 'none';
+  private hideHTMLCanvas(): void {
+    if (this.drawCanvas) this.drawCanvas.style.display = 'none';
   }
 
   private startCountdown(): void {
@@ -508,7 +437,7 @@ export class GameSceneHW extends Phaser.Scene {
       alpha: 1,
       duration: 200,
     });
-    this.showHTMLCanvases();
+    this.showHTMLCanvas();
   }
 
   private updateAnswerDisplay(): void {
@@ -548,16 +477,16 @@ export class GameSceneHW extends Phaser.Scene {
     const userAnswer = parseInt(this.currentInput, 10);
     const isSingleDigit = isSingleDigitAnswer(correctAnswer);
 
-    // 한자리 정답: 오른쪽 캔버스만 입력했을 때
-    if (isSingleDigit && this.rightDigit && !this.leftDigit) {
+    // 한자리 정답
+    if (isSingleDigit && this.currentInput.length === 1) {
       if (userAnswer === correctAnswer) {
         this.handleCorrectAnswer();
       }
       return;
     }
 
-    // 두자리 입력 완료 시
-    if (this.leftDigit && this.rightDigit) {
+    // 두자리 입력
+    if (this.currentInput.length === 2) {
       if (userAnswer === correctAnswer) {
         this.handleCorrectAnswer();
       } else {
@@ -600,7 +529,7 @@ export class GameSceneHW extends Phaser.Scene {
       onComplete: () => {
         this.currentAnswerText.setColor('#ffc947');
         this.currentAnswerText.x = originalX;
-        this.clearCanvas('both');
+        this.clearCanvas();
       },
     });
   }
@@ -613,7 +542,7 @@ export class GameSceneHW extends Phaser.Scene {
       return;
     }
 
-    this.clearCanvas('both');
+    this.clearCanvas();
     this.animateQuestionScroll();
   }
 
@@ -668,7 +597,7 @@ export class GameSceneHW extends Phaser.Scene {
   private endGame(): void {
     this.isPlaying = false;
     this.elapsedTime = Date.now() - this.startTime;
-    this.hideHTMLCanvases();
+    this.hideHTMLCanvas();
 
     this.scene.start('ResultScene', {
       totalTime: this.elapsedTime,
@@ -686,13 +615,11 @@ export class GameSceneHW extends Phaser.Scene {
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width } = gameSize;
     this.timerText?.setPosition(width - 16, 16);
-
-    // HTML 캔버스 위치 업데이트
-    this.updateCanvasPositions();
+    this.updateCanvasPosition();
   }
 
-  private updateCanvasPositions(): void {
-    if (!this.leftCanvas || !this.rightCanvas) return;
+  private updateCanvasPosition(): void {
+    if (!this.drawCanvas) return;
 
     const { width, height } = this.scale;
     const gameCanvas = this.game.canvas;
@@ -700,27 +627,17 @@ export class GameSceneHW extends Phaser.Scene {
 
     const canvasAreaTop = height * 0.4;
     const canvasAreaHeight = height - canvasAreaTop;
-    const gap = 20;
-    const totalWidth = this.canvasSize * 2 + gap;
-    const startX = (width - totalWidth) / 2;
+    const centerX = width / 2;
     const centerY = canvasAreaTop + canvasAreaHeight * 0.35;
 
-    this.leftCanvas.style.left = `${rect.left + startX}px`;
-    this.leftCanvas.style.top = `${rect.top + centerY - this.canvasSize / 2}px`;
-    this.rightCanvas.style.left = `${rect.left + startX + this.canvasSize + gap}px`;
-    this.rightCanvas.style.top = `${rect.top + centerY - this.canvasSize / 2}px`;
+    this.drawCanvas.style.left = `${rect.left + centerX - this.canvasWidth / 2}px`;
+    this.drawCanvas.style.top = `${rect.top + centerY - this.canvasHeight / 2}px`;
   }
 
   private cleanup(): void {
-    // HTML 캔버스 제거
-    if (this.leftCanvas) {
-      this.leftCanvas.remove();
+    if (this.drawCanvas) {
+      this.drawCanvas.remove();
     }
-    if (this.rightCanvas) {
-      this.rightCanvas.remove();
-    }
-
-    // 타이머 정리
     if (this.recognitionTimer) {
       clearTimeout(this.recognitionTimer);
     }
