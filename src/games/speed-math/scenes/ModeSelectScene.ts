@@ -16,7 +16,7 @@ export type GameMode = 'keypad' | 'handwriting';
 export class ModeSelectScene extends Phaser.Scene {
   private isModelLoading = false;
   private modelLoaded = false;
-  private loadingText!: Phaser.GameObjects.Text;
+  private loadingText?: Phaser.GameObjects.Text; // 필기 모드 비활성화로 optional
 
   constructor() {
     super({ key: 'ModeSelectScene' });
@@ -46,41 +46,43 @@ export class ModeSelectScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 숫자패드 모드 버튼
+    // 숫자패드 모드 버튼 (현재 유일하게 활성화된 모드)
     this.createModeButton(
       width / 2,
-      height * 0.42,
+      height * 0.5, // 중앙 배치
       '🔢 숫자패드',
       '빠르고 정확한 입력',
       COLORS.BUTTON_KEYPAD,
       () => this.startGame('keypad')
     );
 
-    // 필기 모드 버튼
-    this.createModeButton(
-      width / 2,
-      height * 0.62,
-      '✏️ 필기 입력',
-      '손글씨로 숫자 입력',
-      COLORS.BUTTON_HANDWRITING,
-      () => this.handleHandwritingSelect()
-    );
+    // TODO: 필기 인식률 개선 후 다시 활성화
+    // // 필기 모드 버튼
+    // this.createModeButton(
+    //   width / 2,
+    //   height * 0.62,
+    //   '✏️ 필기 입력',
+    //   '손글씨로 숫자 입력',
+    //   COLORS.BUTTON_HANDWRITING,
+    //   () => this.handleHandwritingSelect()
+    // );
 
-    // 모델 로딩 상태 텍스트
-    this.loadingText = this.add
-      .text(width / 2, height * 0.78, '', {
-        fontSize: '14px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
+    // // 모델 로딩 상태 텍스트
+    // this.loadingText = this.add
+    //   .text(width / 2, height * 0.78, '', {
+    //     fontSize: '14px',
+    //     fontFamily: 'Pretendard, sans-serif',
+    //     color: COLORS.TEXT_SECONDARY,
+    //   })
+    //   .setOrigin(0.5)
+    //   .setAlpha(0);
 
     // 홈 버튼
     this.createHomeButton(width);
 
-    // 모델 사전 로딩 시작 (백그라운드)
-    this.preloadModel();
+    // TODO: 필기 모드 활성화 시 주석 해제
+    // // 모델 사전 로딩 시작 (백그라운드)
+    // this.preloadModel();
   }
 
   private createBackground(width: number, height: number): void {
@@ -241,8 +243,8 @@ export class ModeSelectScene extends Phaser.Scene {
   }
 
   private showLoadingMessage(message: string): void {
-    this.loadingText.setText(message);
-    this.loadingText.setAlpha(1);
+    this.loadingText?.setText(message);
+    this.loadingText?.setAlpha(1);
   }
 
   private startGame(mode: GameMode): void {
