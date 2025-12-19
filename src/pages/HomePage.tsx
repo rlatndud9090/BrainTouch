@@ -18,8 +18,14 @@ const games = [
   {
     id: 'math-flight',
     title: '🚀 매스 플라이트',
-    description: '운석을 피하며 파워를 모아라!',
+    description: '운석을 피하며 중간값을 찾아라!',
     color: 'from-cyan-500 to-blue-500',
+  },
+  {
+    id: 'block-sum',
+    title: '🧱 블록셈',
+    description: '블록을 빼서 목표 숫자를 맞춰라!',
+    color: 'from-yellow-500 to-orange-500',
   },
 ];
 
