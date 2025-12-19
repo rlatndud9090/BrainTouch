@@ -29,6 +29,7 @@
     "vite": "^5.4.11"
   },
   "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
     "phaser": "^3.80.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

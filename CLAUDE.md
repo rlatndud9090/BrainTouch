@@ -18,15 +18,15 @@
 
 ## 🛠 기술 스택
 
-| 기술              | 버전        | 용도                        |
-| ----------------- | ----------- | --------------------------- |
-| **React**         | ^18.2.0     | UI 프레임워크               |
-| **React Router**  | ^6.22.3     | 페이지 라우팅               |
-| **Phaser 3**      | ^3.80.1     | 2D 게임 엔진 (게임 코어만)  |
-| **TypeScript**    | ^5.3.3      | 타입 안정성                 |
-| **Vite**          | ^5.4.11     | 번들러 & 개발 서버          |
-| **TailwindCSS**   | ^3.4.3      | UI 스타일링                 |
-| **TensorFlow.js** | ^4.x (예정) | 필기 숫자 인식 (speed-math) |
+| 기술              | 버전    | 용도                        |
+| ----------------- | ------- | --------------------------- |
+| **React**         | ^18.2.0 | UI 프레임워크               |
+| **React Router**  | ^6.22.3 | 페이지 라우팅               |
+| **Phaser 3**      | ^3.80.1 | 2D 게임 엔진 (게임 코어만)  |
+| **TypeScript**    | ^5.3.3  | 타입 안정성                 |
+| **Vite**          | ^5.4.11 | 번들러 & 개발 서버          |
+| **TailwindCSS**   | ^3.4.3  | UI 스타일링                 |
+| **TensorFlow.js** | ^4.x    | 필기 숫자 인식 (speed-math) |
 
 ---
 
@@ -74,10 +74,13 @@ BrainTouch/
 │       │   ├── DESIGN.md           # 게임 설계 문서
 │       │   ├── config.ts           # Phaser 설정
 │       │   ├── scenes/
-│       │   │   ├── GameScene.ts    # 메인 게임 씬
+│       │   │   ├── ModeSelectScene.ts # 모드 선택 (필기/숫자패드)
+│       │   │   ├── GameScene.ts    # 숫자패드 모드 게임 씬
+│       │   │   ├── GameSceneHW.ts  # 필기 입력 모드 게임 씬
 │       │   │   └── ResultScene.ts  # 결과 화면
 │       │   └── utils/
-│       │       └── QuestionGenerator.ts  # 문제 생성기
+│       │       ├── QuestionGenerator.ts  # 문제 생성기
+│       │       └── DigitRecognizer.ts    # TensorFlow.js 숫자 인식
 │       └── math-flight/            # Math Flight 게임 (중간값 찾기)
 │           ├── DESIGN.md           # 게임 설계 문서
 │           ├── config.ts           # Phaser 설정
@@ -197,9 +200,9 @@ refactor/<game-name>-<description>
 ### 🔄 진행중
 
 - [x] Speed Math 게임 MVP 구현 완료 (숫자패드 모드)
+- [x] Speed Math 필기 인식 모드 구현 완료 (TensorFlow.js + MNIST)
 - [x] Math Flight 게임 MVP 구현 완료 (중간값 찾기)
 - [ ] Math Flight 밸런스 조정 중
-- [ ] Speed Math 필기 인식 모드 (TensorFlow.js)
 
 ### 🔲 예정
 
@@ -235,16 +238,17 @@ refactor/<game-name>-<description>
 
 ## 📝 최근 변경 이력
 
-| 날짜       | 작업 내용                                             |
-| ---------- | ----------------------------------------------------- |
-| 2025-12-15 | Math Flight 규칙 갈아엎기 (중간값 찾기 게임으로 변경) |
-| 2025-12-15 | Math Flight MVP 구현 (자유 이동, 운석 충돌)           |
-| 2025-12-14 | GAME_IDEAS.md 생성 (게임 아이디어 백로그)             |
-| 2025-12-14 | Speed Math UI 개선 (3-2-1 카운트다운, 3문제 표시)     |
-| 2025-12-14 | Speed Math MVP 구현 (숫자패드, 타이머, 결과화면)      |
-| 2025-12-14 | Speed Math 게임 설계 문서 작성 (DESIGN.md)            |
-| 2025-12-14 | React + Phaser 하이브리드 구조로 마이그레이션         |
-| 2025-12-14 | 프로젝트 초기 환경 구축, 컨벤션 문서 작성             |
+| 날짜       | 작업 내용                                              |
+| ---------- | ------------------------------------------------------ |
+| 2025-12-15 | Speed Math 필기 인식 모드 구현 (TensorFlow.js + MNIST) |
+| 2025-12-15 | Math Flight 규칙 갈아엎기 (중간값 찾기 게임으로 변경)  |
+| 2025-12-15 | Math Flight MVP 구현 (자유 이동, 운석 충돌)            |
+| 2025-12-14 | GAME_IDEAS.md 생성 (게임 아이디어 백로그)              |
+| 2025-12-14 | Speed Math UI 개선 (3-2-1 카운트다운, 3문제 표시)      |
+| 2025-12-14 | Speed Math MVP 구현 (숫자패드, 타이머, 결과화면)       |
+| 2025-12-14 | Speed Math 게임 설계 문서 작성 (DESIGN.md)             |
+| 2025-12-14 | React + Phaser 하이브리드 구조로 마이그레이션          |
+| 2025-12-14 | 프로젝트 초기 환경 구축, 컨벤션 문서 작성              |
 
 ---
 

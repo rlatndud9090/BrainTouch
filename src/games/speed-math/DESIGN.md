@@ -353,9 +353,10 @@ interface GameResult {
 - [x] 숫자패드 입력 모드
 - [x] 타이머 & 결과 화면
 
-### Phase 2
+### Phase 2 ✅ 완료
 
-- [ ] 필기 입력 모드 (TensorFlow.js)
+- [x] 필기 입력 모드 (TensorFlow.js + MNIST)
+- [x] 모드 선택 씬 추가
 - [ ] 어려움 모드 (랜덤 패드)
 - [ ] 로컬 최고 기록 저장
 
@@ -387,11 +388,12 @@ interface GameResult {
 - [x] 결과 화면 구현
 - [x] 애니메이션 추가
 
-### 4단계: 필기 인식 (선택)
+### 4단계: 필기 인식 ✅ 완료
 
-- [ ] TensorFlow.js 통합
-- [ ] 필기 캔버스 구현
-- [ ] 숫자 인식 테스트
+- [x] TensorFlow.js 통합
+- [x] 필기 캔버스 구현 (좌/우 분할)
+- [x] 숫자 인식 (MNIST 모델)
+- [x] 모드 선택 씬 구현
 
 ---
 
