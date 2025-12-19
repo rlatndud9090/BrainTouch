@@ -70,14 +70,22 @@ BrainTouch/
 │       │   ├── config.ts           # Phaser 설정
 │       │   └── scenes/
 │       │       └── MainScene.ts    # 메인 게임 씬
-│       └── speed-math/             # Speed Math 게임 (사칙연산)
+│       ├── speed-math/             # Speed Math 게임 (사칙연산)
+│       │   ├── DESIGN.md           # 게임 설계 문서
+│       │   ├── config.ts           # Phaser 설정
+│       │   ├── scenes/
+│       │   │   ├── GameScene.ts    # 메인 게임 씬
+│       │   │   └── ResultScene.ts  # 결과 화면
+│       │   └── utils/
+│       │       └── QuestionGenerator.ts  # 문제 생성기
+│       └── math-flight/            # Math Flight 게임 (중간값 찾기)
 │           ├── DESIGN.md           # 게임 설계 문서
 │           ├── config.ts           # Phaser 설정
 │           ├── scenes/
 │           │   ├── GameScene.ts    # 메인 게임 씬
 │           │   └── ResultScene.ts  # 결과 화면
 │           └── utils/
-│               └── QuestionGenerator.ts  # 문제 생성기
+│               └── MeteorGenerator.ts  # 운석 생성 알고리즘
 ├── public/                         # 정적 에셋
 │   └── assets/                     # 이미지, 오디오, 폰트
 ├── index.html                      # HTML 템플릿
@@ -87,6 +95,7 @@ BrainTouch/
 ├── tailwind.config.js              # TailwindCSS 설정
 ├── postcss.config.js               # PostCSS 설정
 ├── CONVENTION.md                   # 브랜치/커밋 컨벤션
+├── GAME_IDEAS.md                   # 게임 아이디어 백로그
 ├── README.md                       # 프로젝트 문서
 └── CLAUDE.md                       # 이 파일 (AI 컨텍스트)
 ```
@@ -126,6 +135,17 @@ BrainTouch/
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/QuestionGenerator.ts`: 20문제 생성기 (+, -, ×)
 - 상세 내용은 `src/games/speed-math/DESIGN.md` 참조
+
+### `src/games/math-flight/`
+
+- Math Flight 게임 (매스 플라이트 - 중간값 찾기 러닝 게임)
+- `DESIGN.md`: 게임 설계 문서
+- `config.ts`: Phaser 게임 설정
+- `scenes/GameScene.ts`: 메인 게임 씬 (자유 이동, 운석 낙하, 충돌 판정)
+- `scenes/ResultScene.ts`: 결과 화면
+- `utils/MeteorGenerator.ts`: 운석 생성 알고리즘 (난이도별 분포)
+- **규칙**: 5개 운석 중 가장 큰 수/작은 수 피하고 중간 3개 맞추기
+- 상세 내용은 `src/games/math-flight/DESIGN.md` 참조
 
 ---
 
@@ -177,10 +197,15 @@ refactor/<game-name>-<description>
 ### 🔄 진행중
 
 - [x] Speed Math 게임 MVP 구현 완료 (숫자패드 모드)
+- [x] Math Flight 게임 MVP 구현 완료 (중간값 찾기)
+- [ ] Math Flight 밸런스 조정 중
 - [ ] Speed Math 필기 인식 모드 (TensorFlow.js)
 
 ### 🔲 예정
 
+> 상세 아이디어는 `GAME_IDEAS.md` 참조
+
+- [ ] **블록셈** 게임 개발 (다음 개발 예정)
 - [ ] 게임 UI/UX 개선
 - [ ] 에셋 추가 (이미지, 사운드)
 - [ ] 점수 저장 시스템
@@ -210,14 +235,17 @@ refactor/<game-name>-<description>
 
 ## 📝 최근 변경 이력
 
-| 날짜       | 작업 내용                                         |
-| ---------- | ------------------------------------------------- |
-| 2025-12-14 | Speed Math UI 개선 (3-2-1 카운트다운, 3문제 표시) |
-| 2025-12-14 | Speed Math MVP 구현 (숫자패드, 타이머, 결과화면)  |
-| 2025-12-14 | Speed Math 게임 설계 문서 작성 (DESIGN.md)        |
-| 2025-12-14 | React + Phaser 하이브리드 구조로 마이그레이션     |
-| 2025-12-14 | 프로젝트 초기 환경 구축, 컨벤션 문서 작성         |
+| 날짜       | 작업 내용                                             |
+| ---------- | ----------------------------------------------------- |
+| 2025-12-15 | Math Flight 규칙 갈아엎기 (중간값 찾기 게임으로 변경) |
+| 2025-12-15 | Math Flight MVP 구현 (자유 이동, 운석 충돌)           |
+| 2025-12-14 | GAME_IDEAS.md 생성 (게임 아이디어 백로그)             |
+| 2025-12-14 | Speed Math UI 개선 (3-2-1 카운트다운, 3문제 표시)     |
+| 2025-12-14 | Speed Math MVP 구현 (숫자패드, 타이머, 결과화면)      |
+| 2025-12-14 | Speed Math 게임 설계 문서 작성 (DESIGN.md)            |
+| 2025-12-14 | React + Phaser 하이브리드 구조로 마이그레이션         |
+| 2025-12-14 | 프로젝트 초기 환경 구축, 컨벤션 문서 작성             |
 
 ---
 
-_마지막 업데이트: 2025-12-14_
+_마지막 업데이트: 2025-12-15_
