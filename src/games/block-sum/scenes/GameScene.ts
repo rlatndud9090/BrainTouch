@@ -1,0 +1,561 @@
+import Phaser from 'phaser';
+import {
+  Difficulty,
+  BlockData,
+  RoundData,
+  generateRound,
+  canAchieveTarget,
+  calculateSum,
+  getDifficultyName,
+  getNextDifficulty,
+} from '../utils/BlockGenerator';
+import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
+import { createGradientBackground, playCountdown } from '../../../shared/ui';
+
+// 게임 색상
+const COLORS = {
+  ...BASE_COLORS,
+  ACCENT: THEME_PRESETS.blockSum.accent,
+  ACCENT_HOVER: THEME_PRESETS.blockSum.accentHover,
+  ACCENT_TEXT: THEME_PRESETS.blockSum.accentText,
+  BLOCK_BG: 0x2a2a4e,
+  BLOCK_SELECTED: 0x4a4a6e,
+};
+
+// 블록 스프라이트 정보
+interface BlockSprite {
+  data: BlockData;
+  container: Phaser.GameObjects.Container;
+  isRemoving: boolean;
+}
+
+export class GameScene extends Phaser.Scene {
+  // 게임 상태
+  private score = 0;
+  private clearedRounds = 0;
+  private difficulty: Difficulty = 'easy';
+  private consecutiveSuccess = 0; // 연속 성공 횟수
+  private timeLeft = 60000; // 60초
+  private isPlaying = false;
+
+  // 현재 라운드
+  private currentRound!: RoundData;
+  private blockSprites: BlockSprite[] = [];
+
+  // UI 요소
+  private timerText!: Phaser.GameObjects.Text;
+  private scoreText!: Phaser.GameObjects.Text;
+  private difficultyText!: Phaser.GameObjects.Text;
+  private targetText!: Phaser.GameObjects.Text;
+  private currentSumText!: Phaser.GameObjects.Text;
+  private blockContainer!: Phaser.GameObjects.Container;
+  private submitButton!: Phaser.GameObjects.Container;
+
+  // 스와이프 관련
+  private selectedBlock: BlockSprite | null = null;
+  private swipeStartX = 0;
+  private swipeStartY = 0;
+  private readonly SWIPE_THRESHOLD = 50;
+
+  // 레이아웃
+  private blockWidth = 0;
+  private blockHeight = 0;
+  private blockGap = 8;
+
+  constructor() {
+    super({ key: 'GameScene' });
+  }
+
+  create(): void {
+    const { width, height } = this.scale;
+
+    // 상태 초기화
+    this.score = 0;
+    this.clearedRounds = 0;
+    this.difficulty = 'easy';
+    this.consecutiveSuccess = 0;
+    this.timeLeft = 60000;
+    this.isPlaying = false;
+    this.blockSprites = [];
+
+    // 레이아웃 계산
+    this.calculateLayout(width, height);
+
+    // 배경
+    createGradientBackground(this, width, height);
+
+    // HUD
+    this.createHUD(width);
+
+    // 목표 영역
+    this.createTargetArea(width, height);
+
+    // 블록 컨테이너
+    this.blockContainer = this.add.container(width / 2, height * 0.55);
+
+    // 확인 버튼
+    this.createSubmitButton(width, height);
+
+    // 첫 라운드 준비 (숨김)
+    this.prepareRound();
+    this.blockContainer.setAlpha(0);
+    this.submitButton.setAlpha(0);
+
+    // 카운트다운 시작
+    playCountdown(this, () => this.startGame());
+
+    // 리사이즈 대응
+    this.scale.on('resize', this.handleResize, this);
+  }
+
+  private calculateLayout(width: number, height: number): void {
+    this.blockWidth = Math.min(width * 0.7, 280);
+    this.blockHeight = Math.min(height * 0.08, 60);
+  }
+
+  private createHUD(width: number): void {
+    // 타이머 (좌상단)
+    this.timerText = this.add
+      .text(20, 20, '60.0', {
+        fontSize: '28px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.ACCENT_TEXT,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0, 0);
+
+    // 점수 (우상단)
+    this.scoreText = this.add
+      .text(width - 20, 20, '0점', {
+        fontSize: '24px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.TEXT_PRIMARY,
+      })
+      .setOrigin(1, 0);
+
+    // 난이도 (우상단 아래)
+    this.difficultyText = this.add
+      .text(width - 20, 50, '난이도: 하', {
+        fontSize: '16px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.TEXT_SECONDARY,
+      })
+      .setOrigin(1, 0);
+  }
+
+  private createTargetArea(width: number, height: number): void {
+    const targetY = height * 0.18;
+
+    // "목표" 라벨
+    this.add
+      .text(width / 2, targetY - 30, '목표', {
+        fontSize: '18px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.TEXT_SECONDARY,
+      })
+      .setOrigin(0.5);
+
+    // 목표 숫자
+    this.targetText = this.add
+      .text(width / 2, targetY + 10, '0', {
+        fontSize: '56px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.ACCENT_TEXT,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    // 현재 합계
+    this.currentSumText = this.add
+      .text(width / 2, targetY + 55, '현재: 0', {
+        fontSize: '20px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.TEXT_SECONDARY,
+      })
+      .setOrigin(0.5);
+  }
+
+  private createSubmitButton(width: number, height: number): void {
+    this.submitButton = this.add.container(width / 2, height * 0.88);
+
+    const btnWidth = 160;
+    const btnHeight = 48;
+
+    const bg = this.add
+      .rectangle(0, 0, btnWidth, btnHeight, COLORS.ACCENT, 1)
+      .setStrokeStyle(2, 0xffffff, 0.3);
+    bg.setInteractive({ useHandCursor: true });
+
+    const text = this.add
+      .text(0, 0, '확인', {
+        fontSize: '22px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#1a1a2e',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    this.submitButton.add([bg, text]);
+
+    bg.on('pointerdown', () => {
+      if (!this.isPlaying) return;
+      this.checkAnswer();
+    });
+  }
+
+  private prepareRound(): void {
+    // 기존 블록 제거
+    this.blockSprites.forEach((bs) => bs.container.destroy());
+    this.blockSprites = [];
+
+    // 새 라운드 생성
+    this.currentRound = generateRound(this.difficulty);
+
+    // 목표 업데이트
+    this.targetText.setText(String(this.currentRound.targetSum));
+    this.updateCurrentSum();
+
+    // 블록 생성
+    this.createBlocks();
+  }
+
+  private createBlocks(): void {
+    const blocks = this.currentRound.blocks;
+    const totalHeight = blocks.length * (this.blockHeight + this.blockGap) - this.blockGap;
+    const startY = -totalHeight / 2 + this.blockHeight / 2;
+
+    blocks.forEach((blockData, index) => {
+      const y = startY + index * (this.blockHeight + this.blockGap);
+      const blockSprite = this.createBlockSprite(blockData, 0, y);
+      this.blockSprites.push(blockSprite);
+      this.blockContainer.add(blockSprite.container);
+    });
+  }
+
+  private createBlockSprite(data: BlockData, x: number, y: number): BlockSprite {
+    const container = this.add.container(x, y);
+
+    // 블록 배경
+    const bg = this.add
+      .rectangle(0, 0, this.blockWidth, this.blockHeight, COLORS.BLOCK_BG, 1)
+      .setStrokeStyle(2, 0x4a4a6e);
+
+    // 숫자
+    const text = this.add
+      .text(0, 0, String(data.value), {
+        fontSize: '32px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.TEXT_PRIMARY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    container.add([bg, text]);
+    container.setSize(this.blockWidth, this.blockHeight);
+
+    // 인터랙션 설정
+    bg.setInteractive({ useHandCursor: true, draggable: false });
+
+    const blockSprite: BlockSprite = {
+      data,
+      container,
+      isRemoving: false,
+    };
+
+    // 스와이프 이벤트
+    bg.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!this.isPlaying || blockSprite.isRemoving) return;
+      this.selectedBlock = blockSprite;
+      this.swipeStartX = pointer.x;
+      this.swipeStartY = pointer.y;
+
+      // 선택 효과
+      bg.setFillStyle(COLORS.BLOCK_SELECTED);
+    });
+
+    bg.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (this.selectedBlock !== blockSprite) return;
+
+      const dx = pointer.x - this.swipeStartX;
+      const dy = pointer.y - this.swipeStartY;
+
+      // 왼쪽 스와이프 감지
+      if (dx < -this.SWIPE_THRESHOLD && Math.abs(dy) < Math.abs(dx)) {
+        this.removeBlock(blockSprite);
+      } else {
+        // 스와이프 취소 - 원래 색으로
+        bg.setFillStyle(COLORS.BLOCK_BG);
+      }
+
+      this.selectedBlock = null;
+    });
+
+    bg.on('pointerout', () => {
+      if (this.selectedBlock === blockSprite) {
+        bg.setFillStyle(COLORS.BLOCK_BG);
+        this.selectedBlock = null;
+      }
+    });
+
+    return blockSprite;
+  }
+
+  private removeBlock(blockSprite: BlockSprite): void {
+    if (blockSprite.isRemoving) return;
+    blockSprite.isRemoving = true;
+
+    const index = this.blockSprites.indexOf(blockSprite);
+    if (index === -1) return;
+
+    // 제거 애니메이션 (왼쪽으로 날아감)
+    this.tweens.add({
+      targets: blockSprite.container,
+      x: -this.blockWidth - 50,
+      alpha: 0,
+      duration: 200,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        // 블록 제거
+        this.blockSprites.splice(index, 1);
+        blockSprite.container.destroy();
+
+        // 위 블록들 낙하
+        this.dropBlocks(index);
+
+        // 현재 합계 업데이트
+        this.updateCurrentSum();
+
+        // 달성 가능 여부 체크
+        this.checkAchievability();
+      },
+    });
+  }
+
+  private dropBlocks(fromIndex: number): void {
+    // fromIndex 이후의 블록들(위에 있던 블록들)을 아래로 이동
+    for (let i = fromIndex; i < this.blockSprites.length; i++) {
+      const bs = this.blockSprites[i];
+      const newY = bs.container.y + this.blockHeight + this.blockGap;
+
+      this.tweens.add({
+        targets: bs.container,
+        y: newY,
+        duration: 150,
+        ease: 'Bounce.easeOut',
+      });
+    }
+  }
+
+  private updateCurrentSum(): void {
+    const remainingBlocks = this.blockSprites.filter((bs) => !bs.isRemoving).map((bs) => bs.data);
+    const currentSum = calculateSum(remainingBlocks);
+    this.currentSumText.setText(`현재: ${currentSum}`);
+
+    // 목표와 일치하면 색상 변경
+    if (currentSum === this.currentRound.targetSum) {
+      this.currentSumText.setColor(COLORS.ACCENT_TEXT);
+    } else {
+      this.currentSumText.setColor(COLORS.TEXT_SECONDARY);
+    }
+  }
+
+  private checkAchievability(): void {
+    const remainingBlocks = this.blockSprites.filter((bs) => !bs.isRemoving).map((bs) => bs.data);
+
+    if (!canAchieveTarget(remainingBlocks, this.currentRound.targetSum)) {
+      // 달성 불가능 - 실패 처리
+      this.handleRoundFail();
+    }
+  }
+
+  private checkAnswer(): void {
+    const remainingBlocks = this.blockSprites.filter((bs) => !bs.isRemoving).map((bs) => bs.data);
+    const currentSum = calculateSum(remainingBlocks);
+
+    if (currentSum === this.currentRound.targetSum) {
+      this.handleRoundSuccess(remainingBlocks.length);
+    } else {
+      // 틀림 - 아무 일도 없음 (계속 진행)
+      this.showWrongFeedback();
+    }
+  }
+
+  private handleRoundSuccess(remainingBlockCount: number): void {
+    this.clearedRounds++;
+    this.consecutiveSuccess++;
+
+    // 점수 계산: 남은 블록이 많을수록 높은 점수
+    const baseScore = 100;
+    const bonusMultiplier = remainingBlockCount; // 최소 1
+    const difficultyBonus = this.difficulty === 'hard' ? 3 : this.difficulty === 'normal' ? 2 : 1;
+    const roundScore = baseScore * bonusMultiplier * difficultyBonus;
+
+    this.score += roundScore;
+    this.scoreText.setText(`${this.score}점`);
+
+    // 성공 효과
+    this.showSuccessFeedback(roundScore);
+
+    // 난이도 상승 체크
+    if (this.consecutiveSuccess >= 3 && this.difficulty !== 'hard') {
+      this.difficulty = getNextDifficulty(this.difficulty);
+      this.consecutiveSuccess = 0;
+      this.difficultyText.setText(`난이도: ${getDifficultyName(this.difficulty)}`);
+      this.showDifficultyUpFeedback();
+    }
+
+    // 다음 라운드
+    this.time.delayedCall(500, () => {
+      if (this.isPlaying) {
+        this.prepareRound();
+      }
+    });
+  }
+
+  private handleRoundFail(): void {
+    this.consecutiveSuccess = 0;
+
+    // 실패 효과
+    this.showFailFeedback();
+
+    // 다음 라운드
+    this.time.delayedCall(800, () => {
+      if (this.isPlaying) {
+        this.prepareRound();
+      }
+    });
+  }
+
+  private showSuccessFeedback(points: number): void {
+    const { width, height } = this.scale;
+
+    const text = this.add
+      .text(width / 2, height * 0.4, `+${points}`, {
+        fontSize: '48px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#4ecca3',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: text,
+      y: height * 0.35,
+      alpha: 1,
+      duration: 300,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: text,
+          alpha: 0,
+          y: height * 0.3,
+          duration: 200,
+          delay: 200,
+          onComplete: () => text.destroy(),
+        });
+      },
+    });
+  }
+
+  private showFailFeedback(): void {
+    const { width, height } = this.scale;
+
+    const text = this.add
+      .text(width / 2, height * 0.4, '❌ 불가능!', {
+        fontSize: '36px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#e94560',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: text,
+      alpha: 1,
+      duration: 200,
+      yoyo: true,
+      hold: 400,
+      onComplete: () => text.destroy(),
+    });
+  }
+
+  private showWrongFeedback(): void {
+    // 화면 흔들기
+    this.cameras.main.shake(200, 0.01);
+  }
+
+  private showDifficultyUpFeedback(): void {
+    const { width, height } = this.scale;
+
+    const text = this.add
+      .text(width / 2, height * 0.3, `🔥 난이도 UP!`, {
+        fontSize: '32px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: COLORS.ACCENT_TEXT,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: text,
+      alpha: 1,
+      scale: 1.2,
+      duration: 300,
+      yoyo: true,
+      hold: 500,
+      onComplete: () => text.destroy(),
+    });
+  }
+
+  private startGame(): void {
+    this.isPlaying = true;
+    this.blockContainer.setAlpha(1);
+    this.submitButton.setAlpha(1);
+
+    // 타이머 시작
+    this.time.addEvent({
+      delay: 100,
+      callback: this.updateTimer,
+      callbackScope: this,
+      loop: true,
+    });
+  }
+
+  private updateTimer(): void {
+    if (!this.isPlaying) return;
+
+    this.timeLeft -= 100;
+
+    const seconds = Math.max(0, this.timeLeft / 1000);
+    this.timerText.setText(seconds.toFixed(1));
+
+    // 10초 이하일 때 빨간색
+    if (this.timeLeft <= 10000) {
+      this.timerText.setColor('#e94560');
+    }
+
+    // 타임오버
+    if (this.timeLeft <= 0) {
+      this.endGame();
+    }
+  }
+
+  private endGame(): void {
+    this.isPlaying = false;
+
+    this.scene.start('ResultScene', {
+      score: this.score,
+      clearedRounds: this.clearedRounds,
+      maxDifficulty: getDifficultyName(this.difficulty),
+    });
+  }
+
+  private handleResize(gameSize: Phaser.Structs.Size): void {
+    // 필요 시 리사이즈 로직 추가
+    const { width, height } = gameSize;
+    this.calculateLayout(width, height);
+  }
+}

@@ -41,7 +41,7 @@
 │         PhaserGame 컴포넌트             │  ← React-Phaser 브릿지
 ├─────────────────────────────────────────┤
 │           Phaser 3 Game                 │  ← 게임 로직
-│      (brain-touch, puzzle-pop 등)       │
+│  (brain-touch, speed-math, block-sum)   │
 └─────────────────────────────────────────┘
 ```
 
@@ -65,6 +65,9 @@ BrainTouch/
 │   ├── components/
 │   │   ├── GameCard.tsx            # 게임 카드 컴포넌트
 │   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
+│   ├── shared/                     # 공통 모듈
+│   │   ├── colors.ts               # 공통 색상 팔레트
+│   │   └── ui.ts                   # 공통 UI 유틸리티 (버튼, 배경, 카운트다운)
 │   └── games/
 │       ├── brain-touch/            # Brain Touch 게임
 │       │   ├── config.ts           # Phaser 설정
@@ -74,21 +77,29 @@ BrainTouch/
 │       │   ├── DESIGN.md           # 게임 설계 문서
 │       │   ├── config.ts           # Phaser 설정
 │       │   ├── scenes/
-│       │   │   ├── ModeSelectScene.ts # 모드 선택 (필기/숫자패드)
+│       │   │   ├── ModeSelectScene.ts # 모드 선택 (현재 숫자패드만)
 │       │   │   ├── GameScene.ts    # 숫자패드 모드 게임 씬
-│       │   │   ├── GameSceneHW.ts  # 필기 입력 모드 게임 씬
+│       │   │   ├── GameSceneHW.ts  # 필기 입력 모드 (임시 비활성화)
 │       │   │   └── ResultScene.ts  # 결과 화면
 │       │   └── utils/
 │       │       ├── QuestionGenerator.ts  # 문제 생성기
 │       │       └── DigitRecognizer.ts    # TensorFlow.js 숫자 인식
-│       └── math-flight/            # Math Flight 게임 (중간값 찾기)
+│       ├── math-flight/            # Math Flight 게임 (중간값 찾기)
+│       │   ├── DESIGN.md           # 게임 설계 문서
+│       │   ├── config.ts           # Phaser 설정
+│       │   ├── scenes/
+│       │   │   ├── GameScene.ts    # 메인 게임 씬
+│       │   │   └── ResultScene.ts  # 결과 화면
+│       │   └── utils/
+│       │       └── MeteorGenerator.ts  # 운석 생성 알고리즘
+│       └── block-sum/              # Block Sum 게임 (블록셈)
 │           ├── DESIGN.md           # 게임 설계 문서
 │           ├── config.ts           # Phaser 설정
 │           ├── scenes/
 │           │   ├── GameScene.ts    # 메인 게임 씬
 │           │   └── ResultScene.ts  # 결과 화면
 │           └── utils/
-│               └── MeteorGenerator.ts  # 운석 생성 알고리즘
+│               └── BlockGenerator.ts   # 블록 생성 알고리즘
 ├── public/                         # 정적 에셋
 │   └── assets/                     # 이미지, 오디오, 폰트
 ├── index.html                      # HTML 템플릿
@@ -150,6 +161,24 @@ BrainTouch/
 - **규칙**: 5개 운석 중 가장 큰 수/작은 수 피하고 중간 3개 맞추기
 - 상세 내용은 `src/games/math-flight/DESIGN.md` 참조
 
+### `src/games/block-sum/`
+
+- Block Sum 게임 (블록셈 - 다루마 오토시 스타일 덧셈 퍼즐)
+- `DESIGN.md`: 게임 설계 문서
+- `config.ts`: Phaser 게임 설정
+- `scenes/GameScene.ts`: 메인 게임 씬 (블록 탑, 스와이프 제거, 낙하 애니메이션)
+- `scenes/ResultScene.ts`: 결과 화면
+- `utils/BlockGenerator.ts`: 블록 생성 및 목표 숫자 알고리즘
+- **규칙**: 블록을 스와이프로 제거하여 남은 블록 합 = 목표 숫자
+- **난이도**: 하(4개)→중(5개)→상(6개), 연속 3회 성공 시 승급
+- 상세 내용은 `src/games/block-sum/DESIGN.md` 참조
+
+### `src/shared/`
+
+- 게임 간 공통 모듈
+- `colors.ts`: 공통 색상 팔레트 + 게임별 테마 프리셋
+- `ui.ts`: 공통 UI 유틸리티 (버튼, 배경, 카운트다운, 시간 포맷)
+
 ---
 
 ## ⚡ 개발 명령어
@@ -200,15 +229,17 @@ refactor/<game-name>-<description>
 ### 🔄 진행중
 
 - [x] Speed Math 게임 MVP 구현 완료 (숫자패드 모드)
-- [x] Speed Math 필기 인식 모드 구현 완료 (TensorFlow.js + MNIST)
+- [x] Speed Math 필기 인식 모드 구현 (임시 비활성화 - 인식률 개선 필요)
 - [x] Math Flight 게임 MVP 구현 완료 (중간값 찾기)
-- [ ] Math Flight 밸런스 조정 중
+- [x] Block Sum 게임 MVP 구현 완료 (블록셈)
+- [x] 공통 모듈 분리 (colors.ts, ui.ts)
 
 ### 🔲 예정
 
 > 상세 아이디어는 `GAME_IDEAS.md` 참조
+> 탄토알/이치단트알 시리즈 미니게임 아이디어 킵 중 (스피드 카운팅, 아웃라이어 터치 등)
 
-- [ ] **블록셈** 게임 개발 (다음 개발 예정)
+- [ ] 게임 밸런스 조정 (Math Flight, Block Sum)
 - [ ] 게임 UI/UX 개선
 - [ ] 에셋 추가 (이미지, 사운드)
 - [ ] 점수 저장 시스템
@@ -240,6 +271,10 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2025-12-19 | Block Sum (블록셈) MVP 구현                            |
+| 2025-12-19 | 공통 모듈 분리 (src/shared/colors.ts, ui.ts)           |
+| 2025-12-19 | Math Flight 드래그 입력 버그 수정                      |
+| 2025-12-19 | Speed Math 필기 모드 임시 비활성화 (인식률 이슈)       |
 | 2025-12-15 | Speed Math 필기 인식 모드 구현 (TensorFlow.js + MNIST) |
 | 2025-12-15 | Math Flight 규칙 갈아엎기 (중간값 찾기 게임으로 변경)  |
 | 2025-12-15 | Math Flight MVP 구현 (자유 이동, 운석 충돌)            |
@@ -252,4 +287,4 @@ refactor/<game-name>-<description>
 
 ---
 
-_마지막 업데이트: 2025-12-15_
+_마지막 업데이트: 2025-12-19_
