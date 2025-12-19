@@ -211,13 +211,17 @@ export class GameSceneHW extends Phaser.Scene {
     // 중앙 점선 가이드 (두 자리 숫자 안내)
     const guideLine = this.add.graphics();
     guideLine.lineStyle(1, 0x4a4a6e, 0.5);
-    guideLine.setLineDash([5, 5]);
-    guideLine.lineBetween(
-      centerX,
-      centerY - this.canvasHeight / 2 + 10,
-      centerX,
-      centerY + this.canvasHeight / 2 - 10
-    );
+    // Phaser Graphics는 setLineDash 미지원 → 직접 점선 그리기
+    const startY = centerY - this.canvasHeight / 2 + 10;
+    const endY = centerY + this.canvasHeight / 2 - 10;
+    const dashLength = 5;
+    const gapLength = 5;
+    let y = startY;
+    while (y < endY) {
+      const nextY = Math.min(y + dashLength, endY);
+      guideLine.lineBetween(centerX, y, centerX, nextY);
+      y = nextY + gapLength;
+    }
 
     // 지우기 버튼
     const clearBtnY = centerY + this.canvasHeight / 2 + 35;

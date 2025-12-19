@@ -43,6 +43,7 @@ export class GameScene extends Phaser.Scene {
   private isPlaying = false;
   private hasCollidedThisWave = false;
   private currentDifficulty: Difficulty = 'easy';
+  private isPointerDown = false; // 드래그 상태 추적
 
   // UI 요소
   private livesText!: Phaser.GameObjects.Text;
@@ -107,6 +108,7 @@ export class GameScene extends Phaser.Scene {
     this.playerX = this.scale.width / 2;
     this.currentDifficulty = 'easy';
     this.isPlaying = false;
+    this.isPointerDown = false;
     this.hasCollidedThisWave = false;
     this.meteors = [];
   }
@@ -178,14 +180,24 @@ export class GameScene extends Phaser.Scene {
   private setupInput(): void {
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying) return;
+      this.isPointerDown = true;
       this.movePlayerToX(pointer.x);
     });
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying) return;
-      if (pointer.primaryDown) {
+      // pointer.primaryDown 대신 자체 플래그 사용 (브라우저 호환성 개선)
+      if (this.isPointerDown) {
         this.movePlayerToX(pointer.x);
       }
+    });
+
+    this.input.on('pointerup', () => {
+      this.isPointerDown = false;
+    });
+
+    this.input.on('pointerupoutside', () => {
+      this.isPointerDown = false;
     });
   }
 
