@@ -21,16 +21,22 @@ const DIFFICULTY_CONFIG = {
     blockCount: 4,
     minValue: 1,
     maxValue: 9,
+    maxRemove: 2, // 최대 2개까지만 제거
+    preferRemove: 1, // 주로 1개 제거 (가중치)
   },
   normal: {
     blockCount: 5,
     minValue: 1,
-    maxValue: 12,
+    maxValue: 9,
+    maxRemove: 2, // 최대 2개까지만 제거
+    preferRemove: 1, // 주로 1개 제거 (가중치)
   },
   hard: {
     blockCount: 6,
     minValue: 1,
-    maxValue: 15,
+    maxValue: 9,
+    maxRemove: 2, // 최대 2개까지만 제거
+    preferRemove: 1, // 주로 1개 제거 (가중치)
   },
 } as const;
 
@@ -94,18 +100,38 @@ export function generateRound(difficulty: Difficulty): RoundData {
   // 가능한 모든 합 계산
   const possibleSums = getAllPossibleSums(blocks);
 
-  // 가능한 목표 합 중 하나 선택 (전체 합은 제외 - 아무것도 안 빼면 재미없음)
+  // 가능한 목표 합 중 하나 선택 (제거 개수 제한 적용)
   const totalSum = blocks.reduce((sum, b) => sum + b.value, 0);
-  const validTargets = Array.from(possibleSums.keys()).filter((sum) => sum !== totalSum && sum > 0);
+
+  // maxRemove 이하로 제거하는 목표만 필터링
+  const validTargets: { sum: number; removeCount: number }[] = [];
+  for (const [sum, removedIndices] of possibleSums.entries()) {
+    const removeCount = removedIndices.length;
+    // 최소 1개는 제거해야 하고, maxRemove 이하만 허용
+    if (removeCount >= 1 && removeCount <= config.maxRemove && sum > 0) {
+      validTargets.push({ sum, removeCount });
+    }
+  }
 
   if (validTargets.length === 0) {
-    // 극히 드문 경우 - 다시 생성
+    // 조건에 맞는 목표가 없으면 다시 생성
     return generateRound(difficulty);
   }
 
-  // 랜덤 목표 선택
-  const targetSum = validTargets[randomInt(0, validTargets.length - 1)];
-  const minRemoveCount = possibleSums.get(targetSum)!.length;
+  // 가중치 적용: 적게 제거하는 목표를 선호
+  // preferRemove 이하는 3배 가중치
+  const weightedTargets: { sum: number; removeCount: number }[] = [];
+  for (const target of validTargets) {
+    const weight = target.removeCount <= config.preferRemove ? 3 : 1;
+    for (let i = 0; i < weight; i++) {
+      weightedTargets.push(target);
+    }
+  }
+
+  // 가중치 적용된 목표 중 랜덤 선택
+  const selected = weightedTargets[randomInt(0, weightedTargets.length - 1)];
+  const targetSum = selected.sum;
+  const minRemoveCount = selected.removeCount;
   const minBlocksToKeep = config.blockCount - minRemoveCount;
 
   return {
