@@ -27,6 +27,12 @@ const games = [
     description: '블록을 빼서 목표 숫자를 맞춰라!',
     color: 'from-yellow-500 to-orange-500',
   },
+  {
+    id: 'number-balloon',
+    title: '🎈 숫자풍선',
+    description: '작은 숫자부터 순서대로 터뜨려라!',
+    color: 'from-pink-400 to-rose-500',
+  },
 ];
 
 export default function HomePage() {

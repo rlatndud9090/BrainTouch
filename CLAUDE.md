@@ -173,6 +173,18 @@ BrainTouch/
 - **난이도**: 하(4개)→중(5개)→상(6개), 연속 3회 성공 시 승급
 - 상세 내용은 `src/games/block-sum/DESIGN.md` 참조
 
+### `src/games/number-balloon/`
+
+- Number Balloon 게임 (숫자풍선 - 순서 맞추기)
+- `DESIGN.md`: 게임 설계 문서
+- `config.ts`: Phaser 게임 설정
+- `scenes/GameScene.ts`: 메인 게임 씬 (풍선 터치, 순서 체크)
+- `scenes/ResultScene.ts`: 결과 화면
+- `utils/BalloonGenerator.ts`: 풍선 생성 알고리즘 (정렬 기반 매칭 + index 교환)
+- **규칙**: 작은 숫자부터 순서대로 풍선 터뜨리기, 3번 실패 시 종료
+- **난이도**: 풍선 개수 증가 + 크기-숫자 불일치(페이크) 비율 증가
+- 상세 내용은 `src/games/number-balloon/DESIGN.md` 참조
+
 ### `src/shared/`
 
 - 게임 간 공통 모듈
@@ -232,6 +244,7 @@ refactor/<game-name>-<description>
 - [x] Speed Math 필기 인식 모드 구현 (임시 비활성화 - 인식률 개선 필요)
 - [x] Math Flight 게임 MVP 구현 완료 (중간값 찾기)
 - [x] Block Sum 게임 MVP 구현 완료 (블록셈)
+- [x] Number Balloon 게임 MVP 구현 완료 (숫자풍선)
 - [x] 공통 모듈 분리 (colors.ts, ui.ts)
 
 ### 🔲 예정
@@ -271,6 +284,7 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2025-12-19 | Number Balloon (숫자풍선) MVP 구현                     |
 | 2025-12-19 | Block Sum (블록셈) MVP 구현                            |
 | 2025-12-19 | 공통 모듈 분리 (src/shared/colors.ts, ui.ts)           |
 | 2025-12-19 | Math Flight 드래그 입력 버그 수정                      |
