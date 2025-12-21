@@ -40,7 +40,7 @@ export default function HomePage() {
     <div className="w-full h-full flex flex-col bg-toss-black">
       {/* 헤더 */}
       <header className="flex items-center justify-between px-5 py-4 border-b border-toss-gray-600">
-        <h1 className="text-xl font-bold">🎮 Brain Touch</h1>
+        <h1 className="text-xl font-bold">🧮 브레인 터치 - 계산편</h1>
         <Link to="/ranking" className="text-toss-blue text-sm font-medium">
           랭킹
         </Link>
@@ -66,7 +66,7 @@ export default function HomePage() {
 
       {/* 푸터 */}
       <footer className="px-5 py-3 text-center text-xs text-toss-gray-400 border-t border-toss-gray-600">
-        © 2025 Brain Touch
+        © 2025 브레인 터치
       </footer>
     </div>
   );
