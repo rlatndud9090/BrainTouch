@@ -477,3 +477,4 @@ export class GameScene extends Phaser.Scene {
     this.calculateLayout(width, height);
   }
 }
+
