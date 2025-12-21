@@ -47,9 +47,7 @@ export class GameScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private difficultyText!: Phaser.GameObjects.Text;
   private targetText!: Phaser.GameObjects.Text;
-  private currentSumText!: Phaser.GameObjects.Text;
   private blockContainer!: Phaser.GameObjects.Container;
-  private submitButton!: Phaser.GameObjects.Container;
 
   // 스와이프 관련
   private selectedBlock: BlockSprite | null = null;
@@ -90,16 +88,16 @@ export class GameScene extends Phaser.Scene {
     // 목표 영역
     this.createTargetArea(width, height);
 
-    // 블록 컨테이너
-    this.blockContainer = this.add.container(width / 2, height * 0.55);
+    // 블록 컨테이너 (확인 버튼 제거로 세로 중앙 배치)
+    this.blockContainer = this.add.container(width / 2, height * 0.5);
 
-    // 확인 버튼
-    this.createSubmitButton(width, height);
-
-    // 첫 라운드 준비 (숨김)
+    // 첫 라운드 준비 (카운트다운 동안 숨김)
     this.prepareRound();
     this.blockContainer.setAlpha(0);
-    this.submitButton.setAlpha(0);
+    this.targetText.setAlpha(0);
+
+    // 전역 스와이프 감지 (블록 영역 밖에서 pointerup 되어도 감지)
+    this.setupGlobalSwipeDetection();
 
     // 카운트다운 시작
     playCountdown(this, () => this.startGame());
@@ -111,6 +109,27 @@ export class GameScene extends Phaser.Scene {
   private calculateLayout(width: number, height: number): void {
     this.blockWidth = Math.min(width * 0.7, 280);
     this.blockHeight = Math.min(height * 0.08, 60);
+  }
+
+  private setupGlobalSwipeDetection(): void {
+    // 전역 pointerup 이벤트 - 블록 영역 밖에서 놓아도 스와이프 감지
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (!this.selectedBlock || !this.isPlaying) return;
+
+      const dx = pointer.x - this.swipeStartX;
+      const dy = pointer.y - this.swipeStartY;
+
+      // 왼쪽 스와이프 감지
+      if (dx < -this.SWIPE_THRESHOLD && Math.abs(dy) < Math.abs(dx)) {
+        this.removeBlock(this.selectedBlock);
+      } else {
+        // 스와이프 취소 - 원래 색으로
+        const bg = this.selectedBlock.container.getAt(0) as Phaser.GameObjects.Rectangle;
+        bg?.setFillStyle(COLORS.BLOCK_BG);
+      }
+
+      this.selectedBlock = null;
+    });
   }
 
   private createHUD(width: number): void {
@@ -144,11 +163,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createTargetArea(width: number, height: number): void {
-    const targetY = height * 0.18;
+    const targetY = height * 0.15;
 
     // "목표" 라벨
     this.add
-      .text(width / 2, targetY - 30, '목표', {
+      .text(width / 2, targetY - 25, '목표', {
         fontSize: '18px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
@@ -157,50 +176,13 @@ export class GameScene extends Phaser.Scene {
 
     // 목표 숫자
     this.targetText = this.add
-      .text(width / 2, targetY + 10, '0', {
+      .text(width / 2, targetY + 15, '0', {
         fontSize: '56px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.ACCENT_TEXT,
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
-
-    // 현재 합계
-    this.currentSumText = this.add
-      .text(width / 2, targetY + 55, '현재: 0', {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(0.5);
-  }
-
-  private createSubmitButton(width: number, height: number): void {
-    this.submitButton = this.add.container(width / 2, height * 0.88);
-
-    const btnWidth = 160;
-    const btnHeight = 48;
-
-    const bg = this.add
-      .rectangle(0, 0, btnWidth, btnHeight, COLORS.ACCENT, 1)
-      .setStrokeStyle(2, 0xffffff, 0.3);
-    bg.setInteractive({ useHandCursor: true });
-
-    const text = this.add
-      .text(0, 0, '확인', {
-        fontSize: '22px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#1a1a2e',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    this.submitButton.add([bg, text]);
-
-    bg.on('pointerdown', () => {
-      if (!this.isPlaying) return;
-      this.checkAnswer();
-    });
   }
 
   private prepareRound(): void {
@@ -213,7 +195,6 @@ export class GameScene extends Phaser.Scene {
 
     // 목표 업데이트
     this.targetText.setText(String(this.currentRound.targetSum));
-    this.updateCurrentSum();
 
     // 블록 생성
     this.createBlocks();
@@ -262,7 +243,7 @@ export class GameScene extends Phaser.Scene {
       isRemoving: false,
     };
 
-    // 스와이프 이벤트
+    // pointerdown만 블록에서 처리, pointerup은 전역에서 처리
     bg.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying || blockSprite.isRemoving) return;
       this.selectedBlock = blockSprite;
@@ -273,28 +254,9 @@ export class GameScene extends Phaser.Scene {
       bg.setFillStyle(COLORS.BLOCK_SELECTED);
     });
 
-    bg.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (this.selectedBlock !== blockSprite) return;
-
-      const dx = pointer.x - this.swipeStartX;
-      const dy = pointer.y - this.swipeStartY;
-
-      // 왼쪽 스와이프 감지
-      if (dx < -this.SWIPE_THRESHOLD && Math.abs(dy) < Math.abs(dx)) {
-        this.removeBlock(blockSprite);
-      } else {
-        // 스와이프 취소 - 원래 색으로
-        bg.setFillStyle(COLORS.BLOCK_BG);
-      }
-
-      this.selectedBlock = null;
-    });
-
+    // pointerout에서는 색상만 변경, selectedBlock은 유지 (전역 pointerup에서 처리)
     bg.on('pointerout', () => {
-      if (this.selectedBlock === blockSprite) {
-        bg.setFillStyle(COLORS.BLOCK_BG);
-        this.selectedBlock = null;
-      }
+      // 드래그 중에는 색상 유지
     });
 
     return blockSprite;
@@ -307,7 +269,7 @@ export class GameScene extends Phaser.Scene {
     const index = this.blockSprites.indexOf(blockSprite);
     if (index === -1) return;
 
-    // 제거 애니메이션 (왼쪽으로 날아감)
+    // 제거 애니메이션 (왼쪽으로 날아감, 다른 블록은 그 자리 유지)
     this.tweens.add({
       targets: blockSprite.container,
       x: -this.blockWidth - 50,
@@ -315,68 +277,29 @@ export class GameScene extends Phaser.Scene {
       duration: 200,
       ease: 'Quad.easeIn',
       onComplete: () => {
-        // 블록 제거
+        // 블록 제거 (배열에서만 제거, 다른 블록 위치 변경 없음)
         this.blockSprites.splice(index, 1);
         blockSprite.container.destroy();
 
-        // 위 블록들 낙하
-        this.dropBlocks(index);
-
-        // 현재 합계 업데이트
-        this.updateCurrentSum();
-
-        // 달성 가능 여부 체크
-        this.checkAchievability();
+        // 자동 정답 체크 (목표 달성 시 바로 성공 처리)
+        this.checkAutoSuccess();
       },
     });
   }
 
-  private dropBlocks(fromIndex: number): void {
-    // fromIndex 이후의 블록들(위에 있던 블록들)을 아래로 이동
-    for (let i = fromIndex; i < this.blockSprites.length; i++) {
-      const bs = this.blockSprites[i];
-      const newY = bs.container.y + this.blockHeight + this.blockGap;
-
-      this.tweens.add({
-        targets: bs.container,
-        y: newY,
-        duration: 150,
-        ease: 'Bounce.easeOut',
-      });
-    }
-  }
-
-  private updateCurrentSum(): void {
-    const remainingBlocks = this.blockSprites.filter((bs) => !bs.isRemoving).map((bs) => bs.data);
-    const currentSum = calculateSum(remainingBlocks);
-    this.currentSumText.setText(`현재: ${currentSum}`);
-
-    // 목표와 일치하면 색상 변경
-    if (currentSum === this.currentRound.targetSum) {
-      this.currentSumText.setColor(COLORS.ACCENT_TEXT);
-    } else {
-      this.currentSumText.setColor(COLORS.TEXT_SECONDARY);
-    }
-  }
-
-  private checkAchievability(): void {
-    const remainingBlocks = this.blockSprites.filter((bs) => !bs.isRemoving).map((bs) => bs.data);
-
-    if (!canAchieveTarget(remainingBlocks, this.currentRound.targetSum)) {
-      // 달성 불가능 - 실패 처리
-      this.handleRoundFail();
-    }
-  }
-
-  private checkAnswer(): void {
+  private checkAutoSuccess(): void {
     const remainingBlocks = this.blockSprites.filter((bs) => !bs.isRemoving).map((bs) => bs.data);
     const currentSum = calculateSum(remainingBlocks);
 
+    // 목표 달성! 바로 성공 처리
     if (currentSum === this.currentRound.targetSum) {
       this.handleRoundSuccess(remainingBlocks.length);
-    } else {
-      // 틀림 - 아무 일도 없음 (계속 진행)
-      this.showWrongFeedback();
+      return;
+    }
+
+    // 달성 불가능하면 실패 처리
+    if (!canAchieveTarget(remainingBlocks, this.currentRound.targetSum)) {
+      this.handleRoundFail();
     }
   }
 
@@ -481,11 +404,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private showWrongFeedback(): void {
-    // 화면 흔들기
-    this.cameras.main.shake(200, 0.01);
-  }
-
   private showDifficultyUpFeedback(): void {
     const { width, height } = this.scale;
 
@@ -513,7 +431,7 @@ export class GameScene extends Phaser.Scene {
   private startGame(): void {
     this.isPlaying = true;
     this.blockContainer.setAlpha(1);
-    this.submitButton.setAlpha(1);
+    this.targetText.setAlpha(1);
 
     // 타이머 시작
     this.time.addEvent({
