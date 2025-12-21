@@ -5,7 +5,6 @@ import {
   getCorrectOrder,
   getRoundConfig,
 } from '../utils/BalloonGenerator';
-import { BASE_COLORS } from '../../../shared/colors';
 import { playCountdown } from '../../../shared/ui';
 
 // 게임 색상
@@ -19,10 +18,20 @@ const COLORS = {
   FAIL: 0xe94560,
 };
 
-// 풍선 스프라이트 정보
-interface BalloonSprite {
+// 풍선 물리 설정
+const BALLOON_PHYSICS = {
+  RESTITUTION: 0.8, // 탄성 (튕김 정도)
+  FRICTION: 0, // 마찰 없음
+  FRICTION_AIR: 0.01, // 공기 저항 (서서히 느려짐)
+  INITIAL_SPEED: 1.5, // 초기 속도
+};
+
+// Matter.js 풍선 정보
+interface BalloonBody {
   data: BalloonData;
-  container: Phaser.GameObjects.Container;
+  body: MatterJS.BodyType;
+  graphics: Phaser.GameObjects.Graphics;
+  text: Phaser.GameObjects.Text;
   isPopped: boolean;
 }
 
@@ -36,16 +45,16 @@ export class GameScene extends Phaser.Scene {
 
   // 현재 라운드
   private balloons: BalloonData[] = [];
-  private balloonSprites: BalloonSprite[] = [];
+  private balloonBodies: BalloonBody[] = [];
   private correctOrder: number[] = [];
-  private currentIndex = 0; // 다음에 터뜨려야 할 순서
+  private currentIndex = 0;
 
   // UI 요소
   private livesText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
   private roundText!: Phaser.GameObjects.Text;
   private instructionText!: Phaser.GameObjects.Text;
-  private balloonContainer!: Phaser.GameObjects.Container;
+  private difficultyText!: Phaser.GameObjects.Text;
 
   // 게임 영역
   private gameAreaWidth = 0;
@@ -65,7 +74,7 @@ export class GameScene extends Phaser.Scene {
     this.round = 1;
     this.totalPopped = 0;
     this.isPlaying = false;
-    this.balloonSprites = [];
+    this.balloonBodies = [];
     this.currentIndex = 0;
 
     // 레이아웃 계산
@@ -76,9 +85,6 @@ export class GameScene extends Phaser.Scene {
 
     // HUD
     this.createHUD(width);
-
-    // 풍선 컨테이너
-    this.balloonContainer = this.add.container(0, this.gameAreaTop);
 
     // 안내 텍스트
     this.instructionText = this.add
@@ -91,17 +97,31 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlpha(0);
 
-    // 첫 라운드 준비
-    this.prepareRound();
-    this.balloonContainer.setAlpha(0);
+    // Matter.js 월드 경계 설정 (게임 영역만)
+    this.setupWorldBounds(width, height);
 
-    // 카운트다운 시작
+    // 카운트다운 시작 → 끝나면 게임 시작
     playCountdown(this, () => this.startGame(), {
       color: COLORS.TEXT_DARK,
     });
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
+  }
+
+  update(): void {
+    // 풍선 그래픽을 물리 바디 위치에 동기화
+    this.balloonBodies.forEach((balloon) => {
+      if (balloon.isPopped) return;
+
+      const { body, graphics, text, data } = balloon;
+      const x = body.position.x;
+      const y = body.position.y;
+
+      // 그래픽 위치 업데이트
+      graphics.setPosition(x, y + this.gameAreaTop);
+      text.setPosition(x, y + this.gameAreaTop);
+    });
   }
 
   private calculateLayout(width: number, height: number): void {
@@ -112,13 +132,35 @@ export class GameScene extends Phaser.Scene {
     this.gameAreaHeight = height - this.gameAreaTop - 20;
   }
 
+  private setupWorldBounds(width: number, height: number): void {
+    // 게임 영역에 벽 설정
+    const wallThickness = 50;
+    const gameTop = 0;
+    const gameBottom = this.gameAreaHeight;
+    const gameLeft = 0;
+    const gameRight = width;
+
+    // 사각형 경계 생성 (정적 바디)
+    this.matter.world.setBounds(
+      gameLeft,
+      gameTop,
+      gameRight - gameLeft,
+      gameBottom - gameTop,
+      wallThickness,
+      true, // left
+      true, // right
+      true, // top
+      true // bottom
+    );
+  }
+
   private createBackground(width: number, height: number): void {
     // 하늘색 그라데이션 배경
     const bg = this.add.graphics();
     bg.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xb0e0e6, 0xb0e0e6);
     bg.fillRect(0, 0, width, height);
 
-    // 구름 장식 (간단히)
+    // 구름 장식
     this.addClouds(width);
   }
 
@@ -176,7 +218,7 @@ export class GameScene extends Phaser.Scene {
 
     // 난이도 표시
     const config = getRoundConfig(this.round);
-    this.add
+    this.difficultyText = this.add
       .text(width / 2, hudY + 25, `풍선 ${config.balloonCount}개`, {
         fontSize: '14px',
         fontFamily: 'Pretendard, sans-serif',
@@ -187,55 +229,60 @@ export class GameScene extends Phaser.Scene {
 
   private prepareRound(): void {
     // 기존 풍선 제거
-    this.balloonSprites.forEach((bs) => bs.container.destroy());
-    this.balloonSprites = [];
+    this.balloonBodies.forEach((balloon) => {
+      this.matter.world.remove(balloon.body);
+      balloon.graphics.destroy();
+      balloon.text.destroy();
+    });
+    this.balloonBodies = [];
     this.currentIndex = 0;
 
     // 풍선 생성
     this.balloons = generateBalloons(this.round, this.gameAreaWidth, this.gameAreaHeight);
     this.correctOrder = getCorrectOrder(this.balloons);
 
-    // 풍선 스프라이트 생성
-    this.createBalloonSprites();
+    // 풍선 물리 바디 생성
+    this.createBalloonBodies();
 
     // UI 업데이트
     this.roundText.setText(`Round ${this.round}`);
+    const config = getRoundConfig(this.round);
+    this.difficultyText.setText(`풍선 ${config.balloonCount}개`);
   }
 
-  private createBalloonSprites(): void {
+  private createBalloonBodies(): void {
     this.balloons.forEach((data) => {
-      const sprite = this.createBalloonSprite(data);
-      this.balloonSprites.push(sprite);
-      this.balloonContainer.add(sprite.container);
+      const balloonBody = this.createBalloonBody(data);
+      this.balloonBodies.push(balloonBody);
     });
   }
 
-  private createBalloonSprite(data: BalloonData): BalloonSprite {
-    const container = this.add.container(data.x, data.y);
+  private createBalloonBody(data: BalloonData): BalloonBody {
+    // Matter.js 원형 바디 생성
+    const body = this.matter.add.circle(data.x, data.y, data.size, {
+      restitution: BALLOON_PHYSICS.RESTITUTION,
+      friction: BALLOON_PHYSICS.FRICTION,
+      frictionAir: BALLOON_PHYSICS.FRICTION_AIR,
+      label: `balloon_${data.id}`,
+    });
 
-    // 풍선 본체 (원)
-    const balloon = this.add.graphics();
-    balloon.fillStyle(data.color, 1);
-    balloon.fillCircle(0, 0, data.size);
+    // 랜덤 초기 속도 (빙글빙글 떠다니게)
+    const speed = BALLOON_PHYSICS.INITIAL_SPEED;
+    const angle = Math.random() * Math.PI * 2;
+    this.matter.body.setVelocity(body, {
+      x: Math.cos(angle) * speed,
+      y: Math.sin(angle) * speed,
+    });
 
-    // 하이라이트 (빛 반사 효과)
-    balloon.fillStyle(0xffffff, 0.3);
-    balloon.fillCircle(-data.size * 0.3, -data.size * 0.3, data.size * 0.25);
-
-    // 풍선 꼭지
-    const knot = this.add.graphics();
-    knot.fillStyle(data.color, 1);
-    knot.fillTriangle(-5, data.size, 5, data.size, 0, data.size + 15);
-
-    // 끈
-    const string = this.add.graphics();
-    string.lineStyle(2, 0x888888, 0.8);
-    string.lineBetween(0, data.size + 15, 0, data.size + 40);
+    // 풍선 그래픽 생성
+    const graphics = this.add.graphics();
+    this.drawBalloon(graphics, data);
+    graphics.setPosition(data.x, data.y + this.gameAreaTop);
 
     // 숫자 텍스트
     const fontSize = Math.max(data.size * 0.6, 20);
     const text = this.add
-      .text(0, 0, String(data.value), {
+      .text(data.x, data.y + this.gameAreaTop, String(data.value), {
         fontSize: `${fontSize}px`,
         fontFamily: 'Pretendard, sans-serif',
         color: '#ffffff',
@@ -245,63 +292,66 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    container.add([string, knot, balloon, text]);
+    // 인터랙티브 설정
+    graphics.setInteractive(new Phaser.Geom.Circle(0, 0, data.size), Phaser.Geom.Circle.Contains);
 
-    // 인터랙션 히트 영역
-    const hitArea = this.add.circle(0, 0, data.size, 0xffffff, 0);
-    hitArea.setInteractive({ useHandCursor: true });
-    container.add(hitArea);
-
-    const balloonSprite: BalloonSprite = {
+    const balloonBody: BalloonBody = {
       data,
-      container,
+      body,
+      graphics,
+      text,
       isPopped: false,
     };
 
     // 클릭 이벤트
-    hitArea.on('pointerdown', () => {
-      if (!this.isPlaying || balloonSprite.isPopped) return;
-      this.onBalloonTap(balloonSprite);
+    graphics.on('pointerdown', () => {
+      if (!this.isPlaying || balloonBody.isPopped) return;
+      this.onBalloonTap(balloonBody);
     });
 
-    // 살짝 흔들리는 애니메이션
-    this.tweens.add({
-      targets: container,
-      y: data.y + randomFloat(-5, 5),
-      x: data.x + randomFloat(-3, 3),
-      duration: randomInt(1500, 2500),
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    return balloonSprite;
+    return balloonBody;
   }
 
-  private onBalloonTap(balloonSprite: BalloonSprite): void {
+  private drawBalloon(graphics: Phaser.GameObjects.Graphics, data: BalloonData): void {
+    // 풍선 본체 (원)
+    graphics.fillStyle(data.color, 1);
+    graphics.fillCircle(0, 0, data.size);
+
+    // 하이라이트 (빛 반사 효과)
+    graphics.fillStyle(0xffffff, 0.3);
+    graphics.fillCircle(-data.size * 0.3, -data.size * 0.3, data.size * 0.25);
+
+    // 풍선 꼭지
+    graphics.fillStyle(data.color, 1);
+    graphics.fillTriangle(-5, data.size, 5, data.size, 0, data.size + 15);
+
+    // 끈
+    graphics.lineStyle(2, 0x888888, 0.8);
+    graphics.lineBetween(0, data.size + 15, 0, data.size + 40);
+  }
+
+  private onBalloonTap(balloon: BalloonBody): void {
     const expectedId = this.correctOrder[this.currentIndex];
 
-    if (balloonSprite.data.id === expectedId) {
-      // 정답!
-      this.handleCorrectTap(balloonSprite);
+    if (balloon.data.id === expectedId) {
+      this.handleCorrectTap(balloon);
     } else {
-      // 오답!
-      this.handleWrongTap(balloonSprite);
+      this.handleWrongTap(balloon);
     }
   }
 
-  private handleCorrectTap(balloonSprite: BalloonSprite): void {
-    balloonSprite.isPopped = true;
+  private handleCorrectTap(balloon: BalloonBody): void {
+    balloon.isPopped = true;
     this.currentIndex++;
     this.totalPopped++;
 
-    // 점수 추가 (라운드가 높을수록 더 많은 점수)
+    // 점수 추가
     const points = 10 * this.round;
     this.score += points;
     this.scoreText.setText(`${this.score}점`);
 
     // 터지는 애니메이션
-    this.popBalloon(balloonSprite, true);
+    this.popBalloon(balloon, true);
 
     // 라운드 클리어 체크
     if (this.currentIndex >= this.balloons.length) {
@@ -309,12 +359,12 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private handleWrongTap(balloonSprite: BalloonSprite): void {
+  private handleWrongTap(balloon: BalloonBody): void {
     this.lives--;
     this.updateLivesDisplay();
 
     // 틀린 피드백
-    this.showWrongFeedback(balloonSprite);
+    this.showWrongFeedback(balloon);
 
     // 게임 오버 체크
     if (this.lives <= 0) {
@@ -322,20 +372,21 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private popBalloon(balloonSprite: BalloonSprite, success: boolean): void {
-    const { container } = balloonSprite;
+  private popBalloon(balloon: BalloonBody, success: boolean): void {
+    const { graphics, text, body, data } = balloon;
+    const x = graphics.x;
+    const y = graphics.y;
 
-    // 파티클 효과 (간단히)
+    // 물리 바디 비활성화
+    this.matter.world.remove(body);
+
+    // 파티클 효과
     const particles = this.add.graphics();
-    particles.fillStyle(balloonSprite.data.color, 0.8);
+    particles.fillStyle(data.color, 0.8);
     for (let i = 0; i < 8; i++) {
       const angle = (i / 8) * Math.PI * 2;
       const dist = 20;
-      particles.fillCircle(
-        container.x + Math.cos(angle) * dist,
-        container.y + this.gameAreaTop + Math.sin(angle) * dist,
-        5
-      );
+      particles.fillCircle(x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, 5);
     }
 
     this.tweens.add({
@@ -347,14 +398,15 @@ export class GameScene extends Phaser.Scene {
 
     // 터지는 애니메이션
     this.tweens.add({
-      targets: container,
+      targets: [graphics, text],
       scaleX: 1.3,
       scaleY: 1.3,
       alpha: 0,
       duration: 150,
       ease: 'Quad.easeOut',
       onComplete: () => {
-        container.setVisible(false);
+        graphics.destroy();
+        text.destroy();
       },
     });
 
@@ -362,7 +414,7 @@ export class GameScene extends Phaser.Scene {
     if (success) {
       const points = 10 * this.round;
       const pointsText = this.add
-        .text(container.x, container.y + this.gameAreaTop, `+${points}`, {
+        .text(x, y, `+${points}`, {
           fontSize: '24px',
           fontFamily: 'Pretendard, sans-serif',
           color: '#4ecca3',
@@ -380,22 +432,21 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private showWrongFeedback(balloonSprite: BalloonSprite): void {
+  private showWrongFeedback(balloon: BalloonBody): void {
     // 화면 흔들기
     this.cameras.main.shake(200, 0.01);
 
-    // 풍선 흔들기
-    this.tweens.add({
-      targets: balloonSprite.container,
-      x: balloonSprite.data.x - 10,
-      duration: 50,
-      yoyo: true,
-      repeat: 3,
+    // 풍선에 충격 주기 (튕겨나가게)
+    const pushForce = 0.05;
+    const angle = Math.random() * Math.PI * 2;
+    this.matter.body.applyForce(balloon.body, balloon.body.position, {
+      x: Math.cos(angle) * pushForce,
+      y: Math.sin(angle) * pushForce,
     });
 
     // X 표시
     const xMark = this.add
-      .text(balloonSprite.container.x, balloonSprite.container.y + this.gameAreaTop, '❌', {
+      .text(balloon.graphics.x, balloon.graphics.y, '❌', {
         fontSize: '40px',
       })
       .setOrigin(0.5);
@@ -438,15 +489,14 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => {
         clearText.destroy();
         this.prepareRound();
-        this.balloonContainer.setAlpha(1);
       },
     });
   }
 
   private startGame(): void {
     this.isPlaying = true;
-    this.balloonContainer.setAlpha(1);
     this.instructionText.setAlpha(1);
+    this.prepareRound();
   }
 
   private endGame(): void {
@@ -462,14 +512,6 @@ export class GameScene extends Phaser.Scene {
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
+    this.setupWorldBounds(width, height);
   }
-}
-
-// 유틸 함수
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function randomFloat(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
 }

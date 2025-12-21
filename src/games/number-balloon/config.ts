@@ -22,6 +22,13 @@ export function getGameConfig(
       height: parent.clientHeight,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
+    physics: {
+      default: 'matter',
+      matter: {
+        gravity: { x: 0, y: 0 }, // 중력 없음 (풍선이 둥둥 떠다니게)
+        debug: false, // 디버그 시 true로 변경
+      },
+    },
     scene: [GameScene, ResultScene],
     input: {
       activePointers: 1,

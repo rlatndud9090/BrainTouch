@@ -34,7 +34,11 @@ const BALLOON_COLORS = [
 
 // 풍선 크기 범위
 const MIN_SIZE = 40;
-const MAX_SIZE = 80;
+const MAX_SIZE = 70;
+
+// 그리드 설정
+const GRID_COLS = 3;
+const GRID_ROWS = 3;
 
 /**
  * 라운드에 따른 난이도 설정 반환
@@ -83,57 +87,44 @@ function pickUniqueRandomNumbers(min: number, max: number, count: number): numbe
 }
 
 /**
- * 풍선 위치 생성 (겹치지 않게)
+ * 그리드 기반 풍선 위치 생성 (겹침 방지 보장)
+ * 3×3 그리드에서 필요한 만큼 셀을 선택하고, 셀 중심에 랜덤 오프셋 적용
  */
-function generatePositions(
+function generateGridPositions(
   count: number,
-  sizes: number[],
   areaWidth: number,
   areaHeight: number,
-  padding: number = 20
+  padding: number = 30
 ): { x: number; y: number }[] {
-  const positions: { x: number; y: number }[] = [];
-  const maxAttempts = 100;
+  const cellWidth = (areaWidth - padding * 2) / GRID_COLS;
+  const cellHeight = (areaHeight - padding * 2) / GRID_ROWS;
 
-  for (let i = 0; i < count; i++) {
-    const size = sizes[i];
-    let placed = false;
-    let attempts = 0;
+  // 셀 인덱스 배열 생성 (0~8)
+  const cellIndices = Array.from({ length: GRID_COLS * GRID_ROWS }, (_, i) => i);
 
-    while (!placed && attempts < maxAttempts) {
-      const x = randomInt(size + padding, areaWidth - size - padding);
-      const y = randomInt(size + padding, areaHeight - size - padding);
+  // 셔플해서 필요한 만큼 선택
+  const shuffled = cellIndices.sort(() => Math.random() - 0.5);
+  const selectedCells = shuffled.slice(0, count);
 
-      // 기존 풍선들과 겹치는지 확인
-      let overlaps = false;
-      for (let j = 0; j < positions.length; j++) {
-        const other = positions[j];
-        const otherSize = sizes[j];
-        const distance = Math.sqrt((x - other.x) ** 2 + (y - other.y) ** 2);
-        const minDistance = size + otherSize + 10; // 여유 공간
+  // 각 셀의 중심점 + 랜덤 오프셋
+  const positions = selectedCells.map((cellIndex) => {
+    const col = cellIndex % GRID_COLS;
+    const row = Math.floor(cellIndex / GRID_COLS);
 
-        if (distance < minDistance) {
-          overlaps = true;
-          break;
-        }
-      }
+    // 셀 중심 좌표
+    const centerX = padding + col * cellWidth + cellWidth / 2;
+    const centerY = padding + row * cellHeight + cellHeight / 2;
 
-      if (!overlaps) {
-        positions.push({ x, y });
-        placed = true;
-      }
+    // 랜덤 오프셋 (셀 크기의 15% 범위 내)
+    const offsetRange = Math.min(cellWidth, cellHeight) * 0.15;
+    const offsetX = randomInt(-offsetRange, offsetRange);
+    const offsetY = randomInt(-offsetRange, offsetRange);
 
-      attempts++;
-    }
-
-    // 배치 실패 시 강제 배치
-    if (!placed) {
-      positions.push({
-        x: randomInt(size + padding, areaWidth - size - padding),
-        y: randomInt(size + padding, areaHeight - size - padding),
-      });
-    }
-  }
+    return {
+      x: centerX + offsetX,
+      y: centerY + offsetY,
+    };
+  });
 
   return positions;
 }
@@ -217,8 +208,8 @@ export function generateBalloons(
     [sizes[i], sizes[j]] = [sizes[j], sizes[i]];
   }
 
-  // 5. 위치 생성 (겹치지 않게)
-  const positions = generatePositions(balloonCount, sizes, areaWidth, areaHeight);
+  // 5. 위치 생성 (그리드 기반, 겹침 방지)
+  const positions = generateGridPositions(balloonCount, areaWidth, areaHeight);
 
   // 6. 색상 랜덤 할당
   const shuffledColors = [...BALLOON_COLORS].sort(() => Math.random() - 0.5);
