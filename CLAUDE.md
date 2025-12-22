@@ -67,6 +67,7 @@ BrainTouch/
 │   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
 │   ├── shared/                     # 공통 모듈
 │   │   ├── colors.ts               # 공통 색상 팔레트
+│   │   ├── constants.ts            # 공통 상수 (GAME_LAYOUT 등)
 │   │   └── ui.ts                   # 공통 UI 유틸리티 (버튼, 배경, 카운트다운)
 │   └── games/
 │       ├── brain-touch/            # Brain Touch 게임
@@ -284,6 +285,8 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2025-12-22 | 전체 게임 최대 너비 제한 (480px) + 공통 상수 분리       |
+| 2025-12-22 | Math Flight 운석 크기 레인 비율 적용 + 판정 방식 개선  |
 | 2025-12-19 | Number Balloon (숫자풍선) MVP 구현                     |
 | 2025-12-19 | Block Sum (블록셈) MVP 구현                            |
 | 2025-12-19 | 공통 모듈 분리 (src/shared/colors.ts, ui.ts)           |
@@ -301,4 +304,4 @@ refactor/<game-name>-<description>
 
 ---
 
-_마지막 업데이트: 2025-12-19_
+_마지막 업데이트: 2025-12-22_

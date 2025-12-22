@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
 import { ResultScene } from './scenes/ResultScene';
+import { GAME_LAYOUT } from '../../shared/constants';
 
 export interface GameResult {
   score: number; // 총 점수
@@ -17,8 +18,8 @@ export function getGameConfig(
     parent,
     backgroundColor: '#1a1a2e',
     scale: {
-      mode: Phaser.Scale.RESIZE,
-      width: parent.clientWidth,
+      mode: Phaser.Scale.FIT,
+      width: Math.min(parent.clientWidth, GAME_LAYOUT.MAX_WIDTH),
       height: parent.clientHeight,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
