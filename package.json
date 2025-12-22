@@ -1,7 +1,7 @@
 {
   "name": "brain-touch",
   "version": "0.1.0",
-  "description": "BrainTouch - 앱인토스용 React + Phaser3 게임",
+  "description": "브레인 터치 - 계산편: 앱인토스용 숫자 두뇌 게임 모음",
   "type": "module",
   "scripts": {
     "dev": "vite",
