@@ -26,11 +26,15 @@ const COLORS = {
 // 레인 X 좌표 비율
 const LANE_POSITIONS = [0.1, 0.3, 0.5, 0.7, 0.9];
 
+// 운석 크기 margin (레인 너비 대비)
+const METEOR_MARGIN = 0.15; // 15% margin 양쪽
+
 // 운석 스프라이트
 interface MeteorSprite {
   data: MeteorData;
   container: Phaser.GameObjects.Container;
   y: number;
+  processed: boolean; // 판정 완료 여부
 }
 
 export class GameScene extends Phaser.Scene {
@@ -56,8 +60,11 @@ export class GameScene extends Phaser.Scene {
 
   // 레이아웃
   private laneXPositions: number[] = [];
+  private laneWidth = 0; // 레인 너비
+  private meteorRadius = 0; // 운석 반지름
   private playerY = 0;
   private meteorStartY = 0;
+  private collisionLineY = 0; // 판정 라인 Y 좌표
 
   constructor() {
     super({ key: 'GameScene' });
@@ -96,8 +103,16 @@ export class GameScene extends Phaser.Scene {
 
   private calculateLayout(width: number, height: number): void {
     this.laneXPositions = LANE_POSITIONS.map((ratio) => width * ratio);
+
+    // 레인 너비 계산 (인접 레인 간 거리)
+    this.laneWidth = width * (LANE_POSITIONS[1] - LANE_POSITIONS[0]);
+
+    // 운석 반지름: 레인 너비의 절반에서 margin 제외
+    this.meteorRadius = (this.laneWidth / 2) * (1 - METEOR_MARGIN);
+
     this.playerY = height * 0.85;
-    this.meteorStartY = -50;
+    this.collisionLineY = this.playerY; // 판정 라인 = 플레이어 Y
+    this.meteorStartY = -this.meteorRadius - 10;
     this.baseSpeed = height / 3000; // 3초에 화면 통과 (기본)
   }
 
@@ -285,18 +300,20 @@ export class GameScene extends Phaser.Scene {
 
     const container = this.add.container(x, y);
 
-    // 운석 배경 (모두 동일 색상)
-    const bg = this.add.circle(0, 0, 30, COLORS.METEOR_NORMAL);
+    // 운석 배경 (레인 너비에 맞춘 크기)
+    const bg = this.add.circle(0, 0, this.meteorRadius, COLORS.METEOR_NORMAL);
 
-    // 숫자 텍스트
+    // 숫자 텍스트 (운석 크기에 비례, 고해상도)
+    const fontSize = Math.max(16, Math.floor(this.meteorRadius * 0.7));
     const text = this.add
       .text(0, 0, data.value.toString(), {
-        fontSize: '20px',
+        fontSize: `${fontSize}px`,
         fontFamily: 'Pretendard, sans-serif',
         color: '#ffffff',
         fontStyle: 'bold',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setResolution(2); // 고해상도 렌더링으로 블러 방지
 
     container.add([bg, text]);
 
@@ -304,6 +321,7 @@ export class GameScene extends Phaser.Scene {
       data,
       container,
       y,
+      processed: false, // 아직 판정 안됨
     };
   }
 
@@ -327,7 +345,8 @@ export class GameScene extends Phaser.Scene {
 
     this.meteors.forEach((meteor) => {
       meteor.y += currentSpeed * delta;
-      meteor.container.y = meteor.y;
+      // 정수 좌표로 렌더링하여 블러 방지
+      meteor.container.y = Math.round(meteor.y);
 
       // 화면 밖으로 나간 운석 제거
       if (meteor.y > height + 50) {
@@ -342,24 +361,56 @@ export class GameScene extends Phaser.Scene {
   private checkCollisions(): void {
     if (this.hasCollidedThisWave) return;
 
-    const collisionRadius = 35;
+    // 판정 허용 범위 (Y 좌표 기준)
+    const collisionThreshold = 20;
+
+    // 플레이어가 현재 어느 레인에 있는지 판정
+    const playerLane = this.getPlayerLane();
 
     for (let i = this.meteors.length - 1; i >= 0; i--) {
       const meteor = this.meteors[i];
-      const meteorX = this.laneXPositions[meteor.data.lane];
 
-      const dx = this.playerX - meteorX;
-      const dy = this.playerY - meteor.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      // 이미 판정된 운석은 스킵
+      if (meteor.processed) continue;
 
-      if (distance < collisionRadius) {
-        this.hasCollidedThisWave = true;
-        this.handleCollision(meteor);
-        meteor.container.destroy();
-        this.meteors.splice(i, 1);
-        break;
+      // 운석이 판정 라인을 지나갔는지 체크
+      const crossedLine =
+        meteor.y >= this.collisionLineY - collisionThreshold &&
+        meteor.y <= this.collisionLineY + collisionThreshold;
+
+      if (crossedLine) {
+        // 이 운석의 레인과 플레이어 레인이 같으면 충돌!
+        if (meteor.data.lane === playerLane) {
+          this.hasCollidedThisWave = true;
+          meteor.processed = true;
+          this.handleCollision(meteor);
+          meteor.container.destroy();
+          this.meteors.splice(i, 1);
+          break;
+        }
+      }
+
+      // 운석이 판정 라인을 완전히 지나갔으면 처리 완료로 표시
+      if (meteor.y > this.collisionLineY + collisionThreshold) {
+        meteor.processed = true;
       }
     }
+  }
+
+  // 플레이어가 현재 어느 레인에 있는지 판정
+  private getPlayerLane(): number {
+    let closestLane = 0;
+    let minDistance = Infinity;
+
+    for (let i = 0; i < this.laneXPositions.length; i++) {
+      const distance = Math.abs(this.playerX - this.laneXPositions[i]);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestLane = i;
+      }
+    }
+
+    return closestLane;
   }
 
   private handleCollision(meteor: MeteorSprite): void {
