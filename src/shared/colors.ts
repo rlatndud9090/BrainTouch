@@ -29,6 +29,14 @@ export const BASE_COLORS = {
 
 // 게임별 테마 색상 프리셋
 export const THEME_PRESETS = {
+  // Brain Touch - 핑크/레드 계열
+  brainTouch: {
+    accent: 0xe94560,
+    accentHover: 0xf25672,
+    accentText: '#e94560',
+    circleColors: [0xe94560, 0xff6b8a, 0xc73e54, 0xff4757, 0xee5a70],
+  },
+
   // Speed Math - 녹색 계열
   speedMath: {
     accent: 0x4ecca3,

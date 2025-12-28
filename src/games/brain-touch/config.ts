@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { MainScene } from './scenes/MainScene';
+import { ResultScene } from './scenes/ResultScene';
 import { GAME_LAYOUT } from '../../shared/constants';
 
 export function getGameConfig(
@@ -16,7 +17,7 @@ export function getGameConfig(
       height: parent.clientHeight,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [MainScene],
+    scene: [MainScene, ResultScene],
     physics: {
       default: 'arcade',
       arcade: {

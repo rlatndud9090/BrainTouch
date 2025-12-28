@@ -1,13 +1,37 @@
 import Phaser from 'phaser';
+import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
+import { createGradientBackground, playCountdown } from '../../../shared/ui';
+
+const THEME = THEME_PRESETS.brainTouch;
+
+interface TargetCircle {
+  container: Phaser.GameObjects.Container;
+  circle: Phaser.GameObjects.Arc;
+  text: Phaser.GameObjects.Text;
+  requiredTaps: number;
+  currentTaps: number;
+  hitArea: Phaser.Geom.Circle;
+}
 
 export class MainScene extends Phaser.Scene {
+  // 게임 상태
   private score = 0;
-  private scoreText!: Phaser.GameObjects.Text;
-  private timerText!: Phaser.GameObjects.Text;
-  private targetCircle!: Phaser.GameObjects.Arc;
+  private lives = 3;
   private timeLeft = 30;
   private isPlaying = false;
   private timerEvent?: Phaser.Time.TimerEvent;
+
+  // 타겟 원
+  private target: TargetCircle | null = null;
+  private fadingHitArea: Phaser.Geom.Circle | null = null; // 사라지는 중인 원의 영역
+  private readonly BASE_RADIUS = 45;
+  private readonly HIT_AREA_MULTIPLIER = 1.4; // 터치 허용 범위 확장
+
+  // UI 요소
+  private scoreText!: Phaser.GameObjects.Text;
+  private timerText!: Phaser.GameObjects.Text;
+  private heartsContainer!: Phaser.GameObjects.Container;
+  private heartTexts: Phaser.GameObjects.Text[] = [];
 
   constructor() {
     super({ key: 'MainScene' });
@@ -16,77 +40,136 @@ export class MainScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
 
-    // 배경 그라데이션 효과
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0x1a1a2e, 0x1a1a2e, 0x16213e, 0x16213e);
-    bg.fillRect(0, 0, width, height);
+    // 배경
+    createGradientBackground(this, width, height);
 
-    // 시작 안내
-    const startText = this.add
-      .text(width / 2, height / 2, '터치하여 시작', {
-        fontSize: '28px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
+    // UI 초기화
+    this.createUI();
 
-    // 점수 텍스트
-    this.scoreText = this.add.text(20, 20, '점수: 0', {
-      fontSize: '20px',
-      fontFamily: 'Pretendard, sans-serif',
-      color: '#e94560',
-    });
-
-    // 타이머 텍스트
-    this.timerText = this.add
-      .text(width - 20, 20, `${this.timeLeft}초`, {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#4ecca3',
-      })
-      .setOrigin(1, 0);
-
-    // 타겟 원 (초기에는 숨김)
-    this.targetCircle = this.add.circle(width / 2, height / 2, 40, 0xe94560);
-    this.targetCircle.setVisible(false);
-    this.targetCircle.setInteractive();
-
-    // 타겟 터치 시 점수 획득
-    this.targetCircle.on('pointerdown', () => {
-      if (!this.isPlaying) return;
-
-      this.score += 10;
-      this.scoreText.setText(`점수: ${this.score}`);
-
-      // 터치 효과
-      this.tweens.add({
-        targets: this.targetCircle,
-        scale: 1.3,
-        duration: 50,
-        yoyo: true,
-      });
-
-      // 새 위치로 이동
-      this.moveTarget();
-    });
-
-    // 게임 시작 터치
-    this.input.once('pointerdown', () => {
-      startText.destroy();
-      this.startGame();
-    });
+    // 시작 화면
+    this.showStartScreen();
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
   }
 
+  private createUI(): void {
+    const { width } = this.scale;
+
+    // 점수 텍스트
+    this.scoreText = this.add
+      .text(20, 20, '점수: 0', {
+        fontSize: '22px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: THEME.accentText,
+        fontStyle: 'bold',
+      })
+      .setDepth(100);
+
+    // 타이머 텍스트
+    this.timerText = this.add
+      .text(width - 20, 20, `${this.timeLeft}초`, {
+        fontSize: '22px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#4ecca3',
+        fontStyle: 'bold',
+      })
+      .setOrigin(1, 0)
+      .setDepth(100);
+
+    // 하트(라이프) 컨테이너
+    this.heartsContainer = this.add.container(width / 2, 25).setDepth(100);
+    this.updateHeartsDisplay();
+  }
+
+  private updateHeartsDisplay(): void {
+    // 기존 하트 제거
+    this.heartTexts.forEach((h) => h.destroy());
+    this.heartTexts = [];
+
+    const heartSize = 28;
+    const spacing = 8;
+    const totalWidth = this.lives * heartSize + (this.lives - 1) * spacing;
+    const startX = -totalWidth / 2 + heartSize / 2;
+
+    for (let i = 0; i < 3; i++) {
+      const heart = this.add
+        .text(startX + i * (heartSize + spacing), 0, i < this.lives ? '❤️' : '🖤', {
+          fontSize: '24px',
+        })
+        .setOrigin(0.5);
+
+      this.heartsContainer.add(heart);
+      this.heartTexts.push(heart);
+    }
+  }
+
+  private showStartScreen(): void {
+    const { width, height } = this.scale;
+
+    // 게임 설명
+    const instructionText = this.add
+      .text(width / 2, height / 2 - 60, '🎯 숫자만큼 터치하세요!', {
+        fontSize: '24px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: BASE_COLORS.TEXT_PRIMARY,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    const subText = this.add
+      .text(width / 2, height / 2, '빈 곳을 터치하면 하트가 줄어요', {
+        fontSize: '16px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: BASE_COLORS.TEXT_SECONDARY,
+      })
+      .setOrigin(0.5);
+
+    const startText = this.add
+      .text(width / 2, height / 2 + 80, '👆 터치하여 시작', {
+        fontSize: '20px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#4ecca3',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    // 깜빡임 효과
+    this.tweens.add({
+      targets: startText,
+      alpha: 0.5,
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // 터치하여 시작
+    this.input.once('pointerdown', () => {
+      instructionText.destroy();
+      subText.destroy();
+      startText.destroy();
+
+      // 카운트다운 후 게임 시작
+      playCountdown(this, () => {
+        this.startGame();
+      });
+    });
+  }
+
   private startGame(): void {
     this.isPlaying = true;
     this.score = 0;
+    this.lives = 3;
     this.timeLeft = 30;
+
     this.scoreText.setText('점수: 0');
-    this.targetCircle.setVisible(true);
-    this.moveTarget();
+    this.updateHeartsDisplay();
+
+    // 첫 번째 타겟 생성
+    this.spawnTarget();
+
+    // 전체 화면 터치 이벤트 (타겟 밖 터치 감지)
+    this.input.on('pointerdown', this.handleGlobalTouch, this);
 
     // 타이머 시작
     this.timerEvent = this.time.addEvent({
@@ -97,9 +180,182 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
+  private handleGlobalTouch(pointer: Phaser.Input.Pointer): void {
+    if (!this.isPlaying) return;
+
+    const { x, y } = pointer;
+
+    // 현재 활성화된 타겟이 있는 경우
+    if (this.target) {
+      const circle = this.target.hitArea;
+      const distance = Phaser.Math.Distance.Between(x, y, circle.x, circle.y);
+      const isInsideHitArea = distance <= circle.radius;
+
+      if (isInsideHitArea) {
+        // 타겟 터치 성공
+        this.handleTargetTap();
+      } else {
+        // 빈 곳 터치 - 하트 감소
+        this.loseLife();
+      }
+      return;
+    }
+
+    // 원이 사라지는 중인 경우 (fadingHitArea가 있음)
+    // 어디를 터치하든 추가 터치 = 실패 (숫자보다 더 많이 터치한 것)
+    if (this.fadingHitArea) {
+      this.loseLife();
+      return;
+    }
+  }
+
+  private handleTargetTap(): void {
+    if (!this.target) return;
+
+    this.target.currentTaps++;
+
+    // 남은 터치 횟수 계산
+    const remaining = this.target.requiredTaps - this.target.currentTaps;
+
+    if (remaining <= 0) {
+      // 원 완료 - 점수 획득
+      const bonusMultiplier = this.target.requiredTaps; // 큰 숫자일수록 보너스
+      this.score += 10 * bonusMultiplier;
+      this.scoreText.setText(`점수: ${this.score}`);
+
+      // 사라지는 원의 hitArea 저장 (빈 곳 터치 판정용)
+      this.fadingHitArea = this.target.hitArea;
+
+      // 컨테이너 참조를 로컬에 저장하고, 즉시 target을 null로 설정
+      // (추가 터치 방지)
+      const containerToRemove = this.target.container;
+      this.target = null;
+
+      // 원 사라지는 효과
+      this.tweens.add({
+        targets: containerToRemove,
+        scale: 0,
+        alpha: 0,
+        duration: 150,
+        ease: 'Back.easeIn',
+        onComplete: () => {
+          containerToRemove.destroy();
+          this.fadingHitArea = null; // 사라지는 애니메이션 완료
+          this.spawnTarget();
+        },
+      });
+    } else {
+      // 아직 터치가 남았을 때만 숫자 업데이트 및 효과
+      this.target.text.setText(remaining.toString());
+
+      // 터치 효과 - 원이 잠깐 작아졌다가 커지는 효과
+      this.tweens.add({
+        targets: this.target.container,
+        scale: 0.85,
+        duration: 50,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+      });
+    }
+  }
+
+  private loseLife(): void {
+    this.lives--;
+    this.updateHeartsDisplay();
+
+    // 화면 흔들림 효과
+    this.cameras.main.shake(100, 0.01);
+
+    // 화면 빨간색 플래시
+    const flash = this.add
+      .rectangle(0, 0, this.scale.width, this.scale.height, 0xff0000, 0.3)
+      .setOrigin(0)
+      .setDepth(50);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => flash.destroy(),
+    });
+
+    if (this.lives <= 0) {
+      this.endGame();
+    }
+  }
+
+  private spawnTarget(): void {
+    if (!this.isPlaying) return;
+
+    const { width, height } = this.scale;
+    const padding = 80;
+
+    // 랜덤 위치
+    const x = Phaser.Math.Between(padding, width - padding);
+    const y = Phaser.Math.Between(120, height - padding);
+
+    // 필요한 터치 횟수 (1~5)
+    const requiredTaps = Phaser.Math.Between(1, 5);
+
+    // 원 크기 - 터치 횟수가 많을수록 조금 더 크게
+    const scale = 0.8 + requiredTaps * 0.1;
+    const radius = this.BASE_RADIUS * scale;
+
+    // 랜덤 색상
+    const colorIndex = Phaser.Math.Between(0, THEME.circleColors.length - 1);
+    const color = THEME.circleColors[colorIndex];
+
+    // 원 생성
+    const circle = this.add.circle(0, 0, radius, color);
+    circle.setStrokeStyle(3, 0xffffff, 0.3);
+
+    // 숫자 텍스트
+    const text = this.add
+      .text(0, 0, requiredTaps.toString(), {
+        fontSize: `${Math.floor(radius * 0.9)}px`,
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    // 컨테이너로 묶기
+    const container = this.add.container(x, y, [circle, text]);
+    container.setDepth(10);
+
+    // 등장 애니메이션
+    container.setScale(0);
+    container.setAlpha(0);
+    this.tweens.add({
+      targets: container,
+      scale: 1,
+      alpha: 1,
+      duration: 200,
+      ease: 'Back.easeOut',
+    });
+
+    // 확장된 터치 영역 (실제 원보다 큰 hitArea)
+    const hitRadius = radius * this.HIT_AREA_MULTIPLIER;
+    const hitArea = new Phaser.Geom.Circle(x, y, hitRadius);
+
+    this.target = {
+      container,
+      circle,
+      text,
+      requiredTaps,
+      currentTaps: 0,
+      hitArea,
+    };
+  }
+
   private updateTimer(): void {
     this.timeLeft--;
     this.timerText.setText(`${this.timeLeft}초`);
+
+    // 10초 이하일 때 빨간색으로
+    if (this.timeLeft <= 10) {
+      this.timerText.setColor('#e94560');
+    }
 
     if (this.timeLeft <= 0) {
       this.endGame();
@@ -109,70 +365,34 @@ export class MainScene extends Phaser.Scene {
   private endGame(): void {
     this.isPlaying = false;
     this.timerEvent?.destroy();
-    this.targetCircle.setVisible(false);
+    this.input.off('pointerdown', this.handleGlobalTouch, this);
 
-    const { width, height } = this.scale;
-
-    // 게임 오버 화면
-    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
-
-    this.add
-      .text(width / 2, height / 2 - 60, '게임 종료!', {
-        fontSize: '32px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(width / 2, height / 2, `최종 점수: ${this.score}`, {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#e94560',
-      })
-      .setOrigin(0.5);
-
-    const restartText = this.add
-      .text(width / 2, height / 2 + 80, '터치하여 다시 시작', {
-        fontSize: '18px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#4ecca3',
-      })
-      .setOrigin(0.5);
+    // 타겟 제거
+    if (this.target) {
+      this.target.container.destroy();
+      this.target = null;
+    }
+    this.fadingHitArea = null;
 
     // React에 게임 오버 이벤트 전달
     this.game.events.emit('gameOver', this.score);
 
-    // 다시 시작
-    this.input.once('pointerdown', () => {
-      overlay.destroy();
-      restartText.destroy();
-      this.scene.restart();
+    // 결과 화면으로 전환
+    this.scene.start('ResultScene', {
+      score: this.score,
+      timeUp: this.timeLeft <= 0,
     });
   }
 
-  private moveTarget(): void {
-    const { width, height } = this.scale;
-    const padding = 60;
-
-    const x = Phaser.Math.Between(padding, width - padding);
-    const y = Phaser.Math.Between(100, height - padding);
-
-    this.targetCircle.setPosition(x, y);
-
-    // 크기 랜덤화 (난이도 조절)
-    const scale = Phaser.Math.FloatBetween(0.6, 1.2);
-    this.targetCircle.setScale(scale);
-  }
-
   private handleResize(gameSize: Phaser.Structs.Size): void {
-    const { width, height } = gameSize;
+    const { width } = gameSize;
 
     // UI 위치 조정
     this.timerText?.setPosition(width - 20, 20);
+    this.heartsContainer?.setPosition(width / 2, 25);
   }
 
   update(): void {
-    // 게임 루프 업데이트
+    // 게임 루프 업데이트 (필요 시 사용)
   }
 }
