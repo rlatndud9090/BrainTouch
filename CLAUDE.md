@@ -70,10 +70,11 @@ BrainTouch/
 │   │   ├── constants.ts            # 공통 상수 (GAME_LAYOUT 등)
 │   │   └── ui.ts                   # 공통 UI 유틸리티 (버튼, 배경, 카운트다운)
 │   └── games/
-│       ├── brain-touch/            # Brain Touch 게임
+│       ├── brain-touch/            # Brain Touch 게임 (숫자 터치)
 │       │   ├── config.ts           # Phaser 설정
 │       │   └── scenes/
-│       │       └── MainScene.ts    # 메인 게임 씬
+│       │       ├── MainScene.ts    # 메인 게임 씬
+│       │       └── ResultScene.ts  # 결과 화면
 │       ├── speed-math/             # Speed Math 게임 (사칙연산)
 │       │   ├── DESIGN.md           # 게임 설계 문서
 │       │   ├── config.ts           # Phaser 설정
@@ -137,9 +138,12 @@ BrainTouch/
 
 ### `src/games/brain-touch/`
 
-- Brain Touch 게임 코드
-- `config.ts`: Phaser 설정 생성 함수
-- `scenes/MainScene.ts`: 게임 로직 (터치 게임)
+- Brain Touch 게임 (몸풀기 - 숫자 터치 게임)
+- `config.ts`: Phaser 게임 설정
+- `scenes/MainScene.ts`: 메인 게임 씬 (숫자 원, 하트 시스템, 확장 hitArea)
+- `scenes/ResultScene.ts`: 결과 화면
+- **규칙**: 원에 표시된 숫자만큼 터치해서 원 제거, 빈 곳 터치 시 하트 감소
+- **시스템**: 하트 3개, 30초 제한시간, 터치 횟수에 따른 점수 보너스
 
 ### `src/games/speed-math/`
 
@@ -285,6 +289,7 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2025-12-28 | Brain Touch 개선 (숫자 터치, 하트 시스템, ResultScene) |
 | 2025-12-22 | 전체 게임 최대 너비 제한 (480px) + 공통 상수 분리       |
 | 2025-12-22 | Math Flight 운석 크기 레인 비율 적용 + 판정 방식 개선  |
 | 2025-12-19 | Number Balloon (숫자풍선) MVP 구현                     |
@@ -304,4 +309,4 @@ refactor/<game-name>-<description>
 
 ---
 
-_마지막 업데이트: 2025-12-22_
+_마지막 업데이트: 2025-12-28_
