@@ -86,10 +86,8 @@ export class ResultScene extends Phaser.Scene {
       height * 0.78,
       '홈으로',
       () => {
-        // React에 게임 종료 이벤트 전달
-        this.game.events.emit('gameOver', {
-          totalTime: this.totalTime,
-        });
+        // React에 게임 종료 이벤트 전달 → 홈으로 이동
+        this.game.events.emit('gameOver', { totalTime: this.totalTime });
       },
       0x3a3a5e
     );

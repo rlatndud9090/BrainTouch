@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Question, generateQuestions, isSingleDigitAnswer } from '../utils/QuestionGenerator';
+import { showStartScreen } from '../../../shared/ui';
 
 // 색상 상수
 const COLORS = {
@@ -38,9 +39,6 @@ export class GameScene extends Phaser.Scene {
   // 숫자패드
   private padContainer!: Phaser.GameObjects.Container;
 
-  // 카운트다운
-  private countdownText!: Phaser.GameObjects.Text;
-
   // 레이아웃 설정
   private readonly TOTAL_QUESTIONS = 20;
 
@@ -77,61 +75,18 @@ export class GameScene extends Phaser.Scene {
     this.progressText.setAlpha(0);
     this.timerText.setAlpha(0);
 
-    // 카운트다운 시작
-    this.startCountdown();
+    // 시작 화면 표시
+    showStartScreen(this, {
+      title: '🔢 20문제를 빠르게 풀어보세요!',
+      subtitle: '사칙연산 스피드 퀴즈',
+      onStart: () => {
+        this.showGameUI();
+        this.startGame();
+      },
+    });
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
-  }
-
-  private startCountdown(): void {
-    const { width, height } = this.scale;
-
-    // 카운트다운 텍스트 생성
-    this.countdownText = this.add
-      .text(width / 2, height / 2, '3', {
-        fontSize: '120px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-
-    // 3 -> 2 -> 1 -> 시작!
-    const counts = ['3', '2', '1', '시작!'];
-    let index = 0;
-
-    const showNext = () => {
-      if (index >= counts.length) {
-        // 카운트다운 완료 - 게임 시작
-        this.countdownText.destroy();
-        this.showGameUI();
-        this.startGame();
-        return;
-      }
-
-      this.countdownText.setText(counts[index]);
-      this.countdownText.setFontSize(index === 3 ? '72px' : '120px');
-      this.countdownText.setAlpha(1);
-      this.countdownText.setScale(1.5);
-
-      // 축소 + 페이드아웃 애니메이션
-      this.tweens.add({
-        targets: this.countdownText,
-        scale: 1,
-        alpha: 0,
-        duration: index === 3 ? 400 : 600,
-        ease: 'Power2',
-        onComplete: () => {
-          index++;
-          showNext();
-        },
-      });
-    };
-
-    // 약간의 딜레이 후 시작
-    this.time.delayedCall(300, showNext);
   }
 
   private showGameUI(): void {

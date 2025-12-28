@@ -5,7 +5,7 @@ import {
   getCorrectOrder,
   getRoundConfig,
 } from '../utils/BalloonGenerator';
-import { playCountdown } from '../../../shared/ui';
+import { showStartScreen } from '../../../shared/ui';
 
 // 게임 색상
 const COLORS = {
@@ -100,9 +100,11 @@ export class GameScene extends Phaser.Scene {
     // Matter.js 월드 경계 설정 (게임 영역만)
     this.setupWorldBounds(width, height);
 
-    // 카운트다운 시작 → 끝나면 게임 시작
-    playCountdown(this, () => this.startGame(), {
-      color: COLORS.TEXT_DARK,
+    // 시작 화면 표시
+    showStartScreen(this, {
+      title: '🎈 작은 숫자부터 터치하세요!',
+      subtitle: '순서대로 풍선을 터뜨리면 성공',
+      onStart: () => this.startGame(),
     });
 
     // 리사이즈 대응

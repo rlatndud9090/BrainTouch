@@ -65,7 +65,10 @@ export class ResultScene extends Phaser.Scene {
       duration: 800,
       ease: 'Cubic.easeOut',
       onUpdate: (tween) => {
-        scoreText.setText(Math.floor(tween.getValue()).toString());
+        const value = tween.getValue();
+        if (value !== null) {
+          scoreText.setText(Math.floor(value).toString());
+        }
       },
     });
 
@@ -95,25 +98,39 @@ export class ResultScene extends Phaser.Scene {
     // 버튼들
     this.time.delayedCall(1200, () => {
       // 다시하기 버튼
-      createButton(this, width / 2, height * 0.78, '🔄 다시하기', () => {
-        this.scene.start('MainScene');
-      }, {
-        bgColor: THEME.accent,
-        hoverColor: THEME.accentHover,
-        width: 180,
-        height: 50,
-      });
+      createButton(
+        this,
+        width / 2,
+        height * 0.78,
+        '🔄 다시하기',
+        () => {
+          this.scene.start('MainScene');
+        },
+        {
+          bgColor: THEME.accent,
+          hoverColor: THEME.accentHover,
+          width: 180,
+          height: 50,
+        }
+      );
 
       // 홈으로 버튼
-      createButton(this, width / 2, height * 0.88, '🏠 홈으로', () => {
-        // React 라우터로 홈 이동
-        window.history.back();
-      }, {
-        bgColor: BASE_COLORS.BUTTON_SECONDARY,
-        hoverColor: BASE_COLORS.BUTTON_HOVER,
-        width: 180,
-        height: 50,
-      });
+      createButton(
+        this,
+        width / 2,
+        height * 0.88,
+        '🏠 홈으로',
+        () => {
+          // React에 게임 종료 이벤트 전달 → 홈으로 이동
+          this.game.events.emit('gameOver', this.resultData.score);
+        },
+        {
+          bgColor: BASE_COLORS.BUTTON_SECONDARY,
+          hoverColor: BASE_COLORS.BUTTON_HOVER,
+          width: 180,
+          height: 50,
+        }
+      );
     });
   }
 
@@ -126,4 +143,3 @@ export class ResultScene extends Phaser.Scene {
     return '💪 다시 도전!';
   }
 }
-

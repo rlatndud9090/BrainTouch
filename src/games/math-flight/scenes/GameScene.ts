@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import {
   MeteorData,
-  MeteorType,
   Difficulty,
   generateMeteors,
   getDifficulty,
@@ -9,19 +8,11 @@ import {
   isSuccessMeteor,
   isMedianMeteor,
 } from '../utils/MeteorGenerator';
+import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
+import { showStartScreen } from '../../../shared/ui';
+import { LivesManager } from '../../../shared/lives';
 
-// 색상 상수
-const COLORS = {
-  BG_SPACE: 0x0a0a1a,
-  METEOR_NORMAL: 0x4a6fa5,
-  PLAYER: 0x00d4ff,
-  TEXT_PRIMARY: '#ffffff',
-  TEXT_SECONDARY: '#a0a0a0',
-  LANE_LINE: 0x1a1a3a,
-  SUCCESS_FLASH: 0x4ecca3,
-  FAIL_FLASH: 0xe94560,
-  MEDIAN_FLASH: 0xffc947,
-};
+const THEME = THEME_PRESETS.mathFlight;
 
 // 레인 X 좌표 비율
 const LANE_POSITIONS = [0.1, 0.3, 0.5, 0.7, 0.9];
@@ -40,7 +31,6 @@ interface MeteorSprite {
 export class GameScene extends Phaser.Scene {
   // 게임 상태
   private score = 0;
-  private lives = 3;
   private turnCount = 0;
   private playerX = 0;
   private startTime = 0;
@@ -50,7 +40,7 @@ export class GameScene extends Phaser.Scene {
   private isPointerDown = false; // 드래그 상태 추적
 
   // UI 요소
-  private livesText!: Phaser.GameObjects.Text;
+  private livesManager!: LivesManager;
   private scoreText!: Phaser.GameObjects.Text;
   private player!: Phaser.GameObjects.Container;
 
@@ -94,8 +84,12 @@ export class GameScene extends Phaser.Scene {
     // 입력 설정
     this.setupInput();
 
-    // 카운트다운 후 게임 시작
-    this.startCountdown();
+    // 시작 화면 표시
+    showStartScreen(this, {
+      title: '🚀 중간값 운석을 맞추세요!',
+      subtitle: '5개 중 가장 큰/작은 수를 피하고\n중간 3개를 맞추면 성공',
+      onStart: () => this.startGame(),
+    });
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
@@ -118,7 +112,7 @@ export class GameScene extends Phaser.Scene {
 
   private resetGameState(): void {
     this.score = 0;
-    this.lives = 3;
+    // lives는 LivesManager에서 관리
     this.turnCount = 0;
     this.playerX = this.scale.width / 2;
     this.currentDifficulty = 'easy';
@@ -129,7 +123,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground(width: number, height: number): void {
-    this.add.rectangle(0, 0, width, height, COLORS.BG_SPACE).setOrigin(0, 0);
+    this.add.rectangle(0, 0, width, height, BASE_COLORS.BG_SPACE).setOrigin(0, 0);
 
     // 별 효과
     for (let i = 0; i < 50; i++) {
@@ -143,7 +137,7 @@ export class GameScene extends Phaser.Scene {
 
   private createLaneLines(width: number, height: number): void {
     const graphics = this.add.graphics();
-    graphics.lineStyle(1, COLORS.LANE_LINE, 0.3);
+    graphics.lineStyle(1, BASE_COLORS.LANE_LINE, 0.3);
 
     for (let i = 1; i < 5; i++) {
       const x = width * ((LANE_POSITIONS[i - 1] + LANE_POSITIONS[i]) / 2);
@@ -157,18 +151,18 @@ export class GameScene extends Phaser.Scene {
       .text(16, 16, '0점', {
         fontSize: '24px',
         fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
+        color: BASE_COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
       })
       .setOrigin(0, 0);
 
     // 라이프 (우상단)
-    this.livesText = this.add
-      .text(width - 16, 16, '❤️❤️❤️', {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-      })
-      .setOrigin(1, 0);
+    this.livesManager = new LivesManager(this, {
+      x: width - 60,
+      y: 16,
+      maxLives: 3,
+      align: 'right',
+    });
   }
 
   private createPlayer(): void {
@@ -176,7 +170,7 @@ export class GameScene extends Phaser.Scene {
 
     // 플레이어 모양 (삼각형 우주선)
     const ship = this.add.graphics();
-    ship.fillStyle(COLORS.PLAYER, 1);
+    ship.fillStyle(THEME.player, 1);
     ship.beginPath();
     ship.moveTo(0, -20);
     ship.lineTo(-15, 15);
@@ -223,50 +217,6 @@ export class GameScene extends Phaser.Scene {
     this.player.x = clampedX;
   }
 
-  private startCountdown(): void {
-    const { width, height } = this.scale;
-
-    const countdownText = this.add
-      .text(width / 2, height / 2, '3', {
-        fontSize: '100px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-
-    const counts = ['3', '2', '1', 'GO!'];
-    let index = 0;
-
-    const showNext = () => {
-      if (index >= counts.length) {
-        countdownText.destroy();
-        this.startGame();
-        return;
-      }
-
-      countdownText.setText(counts[index]);
-      countdownText.setFontSize(index === 3 ? '80px' : '100px');
-      countdownText.setAlpha(1);
-      countdownText.setScale(1.5);
-
-      this.tweens.add({
-        targets: countdownText,
-        scale: 1,
-        alpha: 0,
-        duration: index === 3 ? 400 : 600,
-        ease: 'Power2',
-        onComplete: () => {
-          index++;
-          showNext();
-        },
-      });
-    };
-
-    this.time.delayedCall(300, showNext);
-  }
-
   private startGame(): void {
     this.isPlaying = true;
     this.startTime = Date.now();
@@ -301,7 +251,7 @@ export class GameScene extends Phaser.Scene {
     const container = this.add.container(x, y);
 
     // 운석 배경 (레인 너비에 맞춘 크기)
-    const bg = this.add.circle(0, 0, this.meteorRadius, COLORS.METEOR_NORMAL);
+    const bg = this.add.circle(0, 0, this.meteorRadius, THEME.meteorNormal);
 
     // 숫자 텍스트 (운석 크기에 비례, 고해상도)
     const fontSize = Math.max(16, Math.floor(this.meteorRadius * 0.7));
@@ -426,20 +376,20 @@ export class GameScene extends Phaser.Scene {
       this.showSuccessEffect(meteor, earnedScore, isMedianMeteor(type));
     } else {
       // 실패 (min 또는 max)
-      this.lives--;
+      const isGameOver = this.livesManager.loseLife();
       this.showFailEffect();
 
-      if (this.lives <= 0) {
+      if (isGameOver) {
         this.endGame();
         return;
       }
     }
 
-    this.updateHUD();
+    this.scoreText.setText(`${this.score}점`);
   }
 
   private showSuccessEffect(meteor: MeteorSprite, score: number, isMedian: boolean): void {
-    const color = isMedian ? COLORS.MEDIAN_FLASH : COLORS.SUCCESS_FLASH;
+    const color = isMedian ? THEME.medianFlash : THEME.successFlash;
     const text = isMedian ? `+${score} x2!` : `+${score}`;
 
     // 점수 팝업
@@ -477,7 +427,7 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     // 화면 빨간색 플래시
-    const flash = this.add.rectangle(0, 0, width, height, COLORS.FAIL_FLASH, 0.3).setOrigin(0, 0);
+    const flash = this.add.rectangle(0, 0, width, height, THEME.failFlash, 0.3).setOrigin(0, 0);
 
     this.tweens.add({
       targets: flash,
@@ -499,8 +449,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(200, 0.01);
   }
 
-  private updateHUD(): void {
-    this.livesText.setText('❤️'.repeat(this.lives) + '🖤'.repeat(3 - this.lives));
+  private updateScoreDisplay(): void {
     this.scoreText.setText(`${this.score}점`);
   }
 
@@ -537,7 +486,7 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
 
-    this.livesText?.setPosition(width - 16, 16);
+    this.livesManager?.setPosition(width - 60, 16);
 
     if (this.player) {
       this.playerX = Phaser.Math.Clamp(this.playerX, 30, width - 30);

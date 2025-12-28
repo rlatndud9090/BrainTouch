@@ -66,9 +66,10 @@ BrainTouch/
 │   │   ├── GameCard.tsx            # 게임 카드 컴포넌트
 │   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
 │   ├── shared/                     # 공통 모듈
-│   │   ├── colors.ts               # 공통 색상 팔레트
+│   │   ├── colors.ts               # 공통 색상 팔레트 + 테마 프리셋
 │   │   ├── constants.ts            # 공통 상수 (GAME_LAYOUT 등)
-│   │   └── ui.ts                   # 공통 UI 유틸리티 (버튼, 배경, 카운트다운)
+│   │   ├── lives.ts                # 목숨 관리 (LivesManager 클래스)
+│   │   └── ui.ts                   # 공통 UI 유틸리티 (버튼, 배경, 카운트다운, showStartScreen)
 │   └── games/
 │       ├── brain-touch/            # Brain Touch 게임 (숫자 터치)
 │       │   ├── config.ts           # Phaser 설정
@@ -193,8 +194,10 @@ BrainTouch/
 ### `src/shared/`
 
 - 게임 간 공통 모듈
-- `colors.ts`: 공통 색상 팔레트 + 게임별 테마 프리셋
-- `ui.ts`: 공통 UI 유틸리티 (버튼, 배경, 카운트다운, 시간 포맷)
+- `colors.ts`: 공통 색상 팔레트 + 게임별 테마 프리셋 (BASE_COLORS, THEME_PRESETS)
+- `constants.ts`: 공통 상수 (GAME_LAYOUT 등)
+- `ui.ts`: 공통 UI 유틸리티 (버튼, 배경, 카운트다운, 시간 포맷, showStartScreen)
+- `lives.ts`: 목숨 관리 클래스 (LivesManager - 하트 표시, 목숨 증감, 게임오버 체크)
 
 ---
 
@@ -250,7 +253,9 @@ refactor/<game-name>-<description>
 - [x] Math Flight 게임 MVP 구현 완료 (중간값 찾기)
 - [x] Block Sum 게임 MVP 구현 완료 (블록셈)
 - [x] Number Balloon 게임 MVP 구현 완료 (숫자풍선)
-- [x] 공통 모듈 분리 (colors.ts, ui.ts)
+- [x] 공통 모듈 분리 (colors.ts, ui.ts, lives.ts)
+- [x] showStartScreen 공통화 (Brain Touch, Speed Math, Math Flight, Block Sum, Number Balloon)
+- [x] LivesManager 공통화 (Brain Touch, Math Flight)
 
 ### 🔲 예정
 
@@ -289,6 +294,8 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2025-12-28 | 공통 모듈 리팩토링 (showStartScreen, LivesManager 공통화) |
+| 2025-12-28 | Speed Math 모드선택 화면 제거, Home 버튼 수정          |
 | 2025-12-28 | Brain Touch 개선 (숫자 터치, 하트 시스템, ResultScene) |
 | 2025-12-22 | 전체 게임 최대 너비 제한 (480px) + 공통 상수 분리       |
 | 2025-12-22 | Math Flight 운석 크기 레인 비율 적용 + 판정 방식 개선  |
@@ -309,4 +316,4 @@ refactor/<game-name>-<description>
 
 ---
 
-_마지막 업데이트: 2025-12-28_
+_마지막 업데이트: 2025-12-28 (리팩토링)_

@@ -10,9 +10,8 @@ export default function GamePage() {
   };
 
   const handleGameOver = () => {
-    // 게임 종료 이벤트 수신 (ResultScene에서 이동 처리)
-    // 점수 저장 등 필요한 로직 추가 가능
-    console.log('Game Over event received');
+    // 게임 종료 시 홈으로 이동
+    navigate('/');
   };
 
   return (

@@ -174,6 +174,88 @@ export function playCountdown(
 }
 
 /**
+ * 게임 시작 화면 표시
+ * - 게임 설명 표시 후 터치하면 카운트다운 → 게임 시작
+ */
+export function showStartScreen(
+  scene: Phaser.Scene,
+  options: {
+    title: string; // 메인 설명 (예: "🎯 숫자만큼 터치하세요!")
+    subtitle?: string; // 부가 설명 (예: "빈 곳을 터치하면 하트가 줄어요")
+    onStart: () => void; // 카운트다운 후 실행될 콜백
+    titleColor?: string;
+    subtitleColor?: string;
+  }
+): void {
+  const { width, height } = scene.scale;
+  const {
+    title,
+    subtitle,
+    onStart,
+    titleColor = BASE_COLORS.TEXT_PRIMARY,
+    subtitleColor = BASE_COLORS.TEXT_SECONDARY,
+  } = options;
+
+  const elements: Phaser.GameObjects.GameObject[] = [];
+
+  // 메인 설명
+  const titleText = scene.add
+    .text(width / 2, height / 2 - 60, title, {
+      fontSize: '24px',
+      fontFamily: 'Pretendard, sans-serif',
+      color: titleColor,
+      fontStyle: 'bold',
+      align: 'center',
+      wordWrap: { width: width * 0.85 },
+    })
+    .setOrigin(0.5);
+  elements.push(titleText);
+
+  // 부가 설명 (있으면)
+  if (subtitle) {
+    const subtitleText = scene.add
+      .text(width / 2, height / 2, subtitle, {
+        fontSize: '16px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: subtitleColor,
+        align: 'center',
+        wordWrap: { width: width * 0.85 },
+      })
+      .setOrigin(0.5);
+    elements.push(subtitleText);
+  }
+
+  // 터치하여 시작 텍스트
+  const startText = scene.add
+    .text(width / 2, height / 2 + 80, '👆 터치하여 시작', {
+      fontSize: '20px',
+      fontFamily: 'Pretendard, sans-serif',
+      color: '#4ecca3',
+      fontStyle: 'bold',
+    })
+    .setOrigin(0.5);
+  elements.push(startText);
+
+  // 깜빡임 효과
+  scene.tweens.add({
+    targets: startText,
+    alpha: 0.5,
+    duration: 600,
+    yoyo: true,
+    repeat: -1,
+  });
+
+  // 터치하여 시작
+  scene.input.once('pointerdown', () => {
+    // 모든 요소 제거
+    elements.forEach((el) => el.destroy());
+
+    // 카운트다운 후 게임 시작
+    playCountdown(scene, onStart);
+  });
+}
+
+/**
  * 시간 포맷팅 (ms → "X분 Y초" 또는 "X.XX초")
  */
 export function formatTime(ms: number, showDecimals = false): string {

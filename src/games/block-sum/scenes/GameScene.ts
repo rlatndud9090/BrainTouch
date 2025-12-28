@@ -10,7 +10,7 @@ import {
   getNextDifficulty,
 } from '../utils/BlockGenerator';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
-import { createGradientBackground, playCountdown } from '../../../shared/ui';
+import { createGradientBackground, showStartScreen } from '../../../shared/ui';
 
 // 게임 색상
 const COLORS = {
@@ -99,8 +99,12 @@ export class GameScene extends Phaser.Scene {
     // 전역 스와이프 감지 (블록 영역 밖에서 pointerup 되어도 감지)
     this.setupGlobalSwipeDetection();
 
-    // 카운트다운 시작
-    playCountdown(this, () => this.startGame());
+    // 시작 화면 표시
+    showStartScreen(this, {
+      title: '🧱 블록을 스와이프로 제거하세요!',
+      subtitle: '남은 블록의 합이 목표 숫자가 되도록',
+      onStart: () => this.startGame(),
+    });
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);

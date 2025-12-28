@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
-import { createGradientBackground, playCountdown } from '../../../shared/ui';
+import { THEME_PRESETS } from '../../../shared/colors';
+import { createGradientBackground, showStartScreen } from '../../../shared/ui';
+import { LivesManager } from '../../../shared/lives';
 
 const THEME = THEME_PRESETS.brainTouch;
 
@@ -16,7 +17,6 @@ interface TargetCircle {
 export class MainScene extends Phaser.Scene {
   // 게임 상태
   private score = 0;
-  private lives = 3;
   private timeLeft = 30;
   private isPlaying = false;
   private timerEvent?: Phaser.Time.TimerEvent;
@@ -30,8 +30,7 @@ export class MainScene extends Phaser.Scene {
   // UI 요소
   private scoreText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
-  private heartsContainer!: Phaser.GameObjects.Container;
-  private heartTexts: Phaser.GameObjects.Text[] = [];
+  private livesManager!: LivesManager;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -77,93 +76,29 @@ export class MainScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setDepth(100);
 
-    // 하트(라이프) 컨테이너
-    this.heartsContainer = this.add.container(width / 2, 25).setDepth(100);
-    this.updateHeartsDisplay();
-  }
-
-  private updateHeartsDisplay(): void {
-    // 기존 하트 제거
-    this.heartTexts.forEach((h) => h.destroy());
-    this.heartTexts = [];
-
-    const heartSize = 28;
-    const spacing = 8;
-    const totalWidth = this.lives * heartSize + (this.lives - 1) * spacing;
-    const startX = -totalWidth / 2 + heartSize / 2;
-
-    for (let i = 0; i < 3; i++) {
-      const heart = this.add
-        .text(startX + i * (heartSize + spacing), 0, i < this.lives ? '❤️' : '🖤', {
-          fontSize: '24px',
-        })
-        .setOrigin(0.5);
-
-      this.heartsContainer.add(heart);
-      this.heartTexts.push(heart);
-    }
+    // 하트(라이프) 매니저
+    this.livesManager = new LivesManager(this, {
+      x: width / 2,
+      y: 25,
+      maxLives: 3,
+    });
   }
 
   private showStartScreen(): void {
-    const { width, height } = this.scale;
-
-    // 게임 설명
-    const instructionText = this.add
-      .text(width / 2, height / 2 - 60, '🎯 숫자만큼 터치하세요!', {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: BASE_COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    const subText = this.add
-      .text(width / 2, height / 2, '빈 곳을 터치하면 하트가 줄어요', {
-        fontSize: '16px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: BASE_COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(0.5);
-
-    const startText = this.add
-      .text(width / 2, height / 2 + 80, '👆 터치하여 시작', {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#4ecca3',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    // 깜빡임 효과
-    this.tweens.add({
-      targets: startText,
-      alpha: 0.5,
-      duration: 600,
-      yoyo: true,
-      repeat: -1,
-    });
-
-    // 터치하여 시작
-    this.input.once('pointerdown', () => {
-      instructionText.destroy();
-      subText.destroy();
-      startText.destroy();
-
-      // 카운트다운 후 게임 시작
-      playCountdown(this, () => {
-        this.startGame();
-      });
+    showStartScreen(this, {
+      title: '🎯 숫자만큼 터치하세요!',
+      subtitle: '빈 곳을 터치하면 하트가 줄어요',
+      onStart: () => this.startGame(),
     });
   }
 
   private startGame(): void {
     this.isPlaying = true;
     this.score = 0;
-    this.lives = 3;
     this.timeLeft = 30;
 
     this.scoreText.setText('점수: 0');
-    this.updateHeartsDisplay();
+    this.livesManager.reset();
 
     // 첫 번째 타겟 생성
     this.spawnTarget();
@@ -260,8 +195,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   private loseLife(): void {
-    this.lives--;
-    this.updateHeartsDisplay();
+    const isGameOver = this.livesManager.loseLife();
 
     // 화면 흔들림 효과
     this.cameras.main.shake(100, 0.01);
@@ -279,7 +213,7 @@ export class MainScene extends Phaser.Scene {
       onComplete: () => flash.destroy(),
     });
 
-    if (this.lives <= 0) {
+    if (isGameOver) {
       this.endGame();
     }
   }
@@ -374,10 +308,7 @@ export class MainScene extends Phaser.Scene {
     }
     this.fadingHitArea = null;
 
-    // React에 게임 오버 이벤트 전달
-    this.game.events.emit('gameOver', this.score);
-
-    // 결과 화면으로 전환
+    // 결과 화면으로 전환 (gameOver는 ResultScene에서 emit)
     this.scene.start('ResultScene', {
       score: this.score,
       timeUp: this.timeLeft <= 0,
@@ -389,7 +320,7 @@ export class MainScene extends Phaser.Scene {
 
     // UI 위치 조정
     this.timerText?.setPosition(width - 20, 20);
-    this.heartsContainer?.setPosition(width / 2, 25);
+    this.livesManager?.setPosition(width / 2, 25);
   }
 
   update(): void {

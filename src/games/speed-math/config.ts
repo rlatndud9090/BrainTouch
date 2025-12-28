@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { GameScene } from './scenes/GameScene';
 import { GameSceneHW } from './scenes/GameSceneHW';
 import { ResultScene } from './scenes/ResultScene';
@@ -23,7 +22,7 @@ export function getGameConfig(
       height: parent.clientHeight,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [ModeSelectScene, GameScene, GameSceneHW, ResultScene],
+    scene: [GameScene, GameSceneHW, ResultScene],
     input: {
       activePointers: 3,
     },
