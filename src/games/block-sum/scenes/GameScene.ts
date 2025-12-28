@@ -53,7 +53,9 @@ export class GameScene extends Phaser.Scene {
   private selectedBlock: BlockSprite | null = null;
   private swipeStartX = 0;
   private swipeStartY = 0;
-  private readonly SWIPE_THRESHOLD = 50;
+  private swipeStartTime = 0;
+  private readonly SWIPE_SPEED_THRESHOLD = 0.8; // px/ms (속도 임계값)
+  private readonly SWIPE_MIN_DISTANCE = 30; // 최소 이동 거리
 
   // 레이아웃
   private blockWidth = 0;
@@ -116,21 +118,38 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupGlobalSwipeDetection(): void {
-    // 전역 pointerup 이벤트 - 블록 영역 밖에서 놓아도 스와이프 감지
-    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+    // pointermove에서 속도 기반 스와이프 감지
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!this.selectedBlock || !this.isPlaying) return;
 
       const dx = pointer.x - this.swipeStartX;
       const dy = pointer.y - this.swipeStartY;
+      const elapsed = pointer.time - this.swipeStartTime;
 
-      // 왼쪽 스와이프 감지
-      if (dx < -this.SWIPE_THRESHOLD && Math.abs(dy) < Math.abs(dx)) {
-        this.removeBlock(this.selectedBlock);
-      } else {
-        // 스와이프 취소 - 원래 색으로
-        const bg = this.selectedBlock.container.getAt(0) as Phaser.GameObjects.Rectangle;
-        bg?.setFillStyle(COLORS.BLOCK_BG);
+      // 수평 이동이 수직보다 커야 함
+      if (Math.abs(dx) <= Math.abs(dy)) return;
+
+      // 최소 거리 체크
+      if (Math.abs(dx) < this.SWIPE_MIN_DISTANCE) return;
+
+      // 속도 계산 (px/ms)
+      const speed = Math.abs(dx) / Math.max(elapsed, 1);
+
+      // 속도가 임계값 이상이면 스와이프 성공 (좌우 모두 가능)
+      if (speed >= this.SWIPE_SPEED_THRESHOLD) {
+        const direction = dx > 0 ? 'right' : 'left';
+        this.removeBlock(this.selectedBlock, direction);
+        this.selectedBlock = null;
       }
+    });
+
+    // pointerup에서는 선택 해제만
+    this.input.on('pointerup', () => {
+      if (!this.selectedBlock) return;
+
+      // 스와이프 취소 - 원래 색으로
+      const bg = this.selectedBlock.container.getAt(0) as Phaser.GameObjects.Rectangle;
+      bg?.setFillStyle(COLORS.BLOCK_BG);
 
       this.selectedBlock = null;
     });
@@ -247,12 +266,13 @@ export class GameScene extends Phaser.Scene {
       isRemoving: false,
     };
 
-    // pointerdown만 블록에서 처리, pointerup은 전역에서 처리
+    // pointerdown에서 블록 선택 및 스와이프 시작점 기록
     bg.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying || blockSprite.isRemoving) return;
       this.selectedBlock = blockSprite;
       this.swipeStartX = pointer.x;
       this.swipeStartY = pointer.y;
+      this.swipeStartTime = pointer.time;
 
       // 선택 효과
       bg.setFillStyle(COLORS.BLOCK_SELECTED);
@@ -266,17 +286,20 @@ export class GameScene extends Phaser.Scene {
     return blockSprite;
   }
 
-  private removeBlock(blockSprite: BlockSprite): void {
+  private removeBlock(blockSprite: BlockSprite, direction: 'left' | 'right' = 'left'): void {
     if (blockSprite.isRemoving) return;
     blockSprite.isRemoving = true;
 
     const index = this.blockSprites.indexOf(blockSprite);
     if (index === -1) return;
 
-    // 제거 애니메이션 (왼쪽으로 날아감, 다른 블록은 그 자리 유지)
+    // 스와이프 방향에 따라 날아가는 방향 결정
+    const targetX = direction === 'left' ? -this.blockWidth - 50 : this.blockWidth + 50;
+
+    // 제거 애니메이션
     this.tweens.add({
       targets: blockSprite.container,
-      x: -this.blockWidth - 50,
+      x: targetX,
       alpha: 0,
       duration: 200,
       ease: 'Quad.easeIn',
