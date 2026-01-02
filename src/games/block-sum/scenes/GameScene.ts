@@ -9,8 +9,9 @@ import {
   getDifficultyName,
   getNextDifficulty,
 } from '../utils/BlockGenerator';
-import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
+import { BASE_COLORS, THEME_PRESETS, COLORFUL_PALETTE } from '../../../shared/colors';
 import { createGradientBackground, showStartScreen } from '../../../shared/ui';
+import { TopBar, TOP_BAR } from '../../../shared/topBar';
 
 // 게임 색상
 const COLORS = {
@@ -18,9 +19,11 @@ const COLORS = {
   ACCENT: THEME_PRESETS.blockSum.accent,
   ACCENT_HOVER: THEME_PRESETS.blockSum.accentHover,
   ACCENT_TEXT: THEME_PRESETS.blockSum.accentText,
-  BLOCK_BG: 0x2a2a4e,
-  BLOCK_SELECTED: 0x4a4a6e,
+  BLOCK_SELECTED: 0x6a6a8e,
 };
+
+// 블록 색상 팔레트 (공통 팔레트 사용)
+const BLOCK_COLORS = COLORFUL_PALETTE;
 
 // 블록 스프라이트 정보
 interface BlockSprite {
@@ -43,8 +46,7 @@ export class GameScene extends Phaser.Scene {
   private blockSprites: BlockSprite[] = [];
 
   // UI 요소
-  private timerText!: Phaser.GameObjects.Text;
-  private scoreText!: Phaser.GameObjects.Text;
+  private topBar!: TopBar;
   private difficultyText!: Phaser.GameObjects.Text;
   private targetText!: Phaser.GameObjects.Text;
   private blockContainer!: Phaser.GameObjects.Container;
@@ -113,8 +115,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private calculateLayout(width: number, height: number): void {
-    this.blockWidth = Math.min(width * 0.7, 280);
-    this.blockHeight = Math.min(height * 0.08, 60);
+    // 블록 가로를 3/4로 줄이고, 높이는 1.5배로
+    this.blockWidth = Math.min(width * 0.525, 210); // 기존 0.7 * 0.75 = 0.525
+    this.blockHeight = Math.min(height * 0.12, 90); // 기존 0.08 * 1.5 = 0.12
   }
 
   private setupGlobalSwipeDetection(): void {
@@ -147,42 +150,43 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerup', () => {
       if (!this.selectedBlock) return;
 
-      // 스와이프 취소 - 원래 색으로
-      const bg = this.selectedBlock.container.getAt(0) as Phaser.GameObjects.Rectangle;
-      bg?.setFillStyle(COLORS.BLOCK_BG);
+      // 스와이프 취소 - 원래 색으로 복원
+      const container = this.selectedBlock.container as any;
+      const bg = container.bgGraphics as Phaser.GameObjects.Graphics;
+      const originalColor = container.originalColor;
+      if (bg && originalColor !== undefined) {
+        const radius = 16;
+        bg.clear();
+        bg.fillStyle(originalColor, 1);
+        bg.fillRoundedRect(
+          -this.blockWidth / 2,
+          -this.blockHeight / 2,
+          this.blockWidth,
+          this.blockHeight,
+          radius
+        );
+      }
 
       this.selectedBlock = null;
     });
   }
 
   private createHUD(width: number): void {
-    // 타이머 (좌상단)
-    this.timerText = this.add
-      .text(20, 20, '60.0', {
-        fontSize: '28px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.ACCENT_TEXT,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0, 0);
+    // 공통 상단 바 생성
+    this.topBar = new TopBar(this, {
+      left: { type: 'time', initialValue: 60, color: COLORS.ACCENT_TEXT },
+      right: { type: 'score', initialValue: 0 },
+    });
 
-    // 점수 (우상단)
-    this.scoreText = this.add
-      .text(width - 20, 20, '0점', {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-      })
-      .setOrigin(1, 0);
-
-    // 난이도 (우상단 아래)
+    // 난이도 (우상단 아래, TopBar 바깥)
     this.difficultyText = this.add
-      .text(width - 20, 50, '난이도: 하', {
-        fontSize: '16px',
+      .text(width - TOP_BAR.PADDING_X, TOP_BAR.HEIGHT + 5, '난이도: 하', {
+        fontSize: '14px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
       })
-      .setOrigin(1, 0);
+      .setOrigin(1, 0)
+      .setDepth(100);
   }
 
   private createTargetArea(width: number, height: number): void {
@@ -230,35 +234,55 @@ export class GameScene extends Phaser.Scene {
 
     blocks.forEach((blockData, index) => {
       const y = startY + index * (this.blockHeight + this.blockGap);
-      const blockSprite = this.createBlockSprite(blockData, 0, y);
+      const blockSprite = this.createBlockSprite(blockData, 0, y, index);
       this.blockSprites.push(blockSprite);
       this.blockContainer.add(blockSprite.container);
     });
   }
 
-  private createBlockSprite(data: BlockData, x: number, y: number): BlockSprite {
+  private createBlockSprite(
+    data: BlockData,
+    x: number,
+    y: number,
+    colorIndex: number
+  ): BlockSprite {
     const container = this.add.container(x, y);
 
-    // 블록 배경
-    const bg = this.add
-      .rectangle(0, 0, this.blockWidth, this.blockHeight, COLORS.BLOCK_BG, 1)
-      .setStrokeStyle(2, 0x4a4a6e);
+    // 블록 색상 선택
+    const blockColor = BLOCK_COLORS[colorIndex % BLOCK_COLORS.length];
+    const radius = 16; // 모서리 둥글기
 
-    // 숫자
+    // 둥근 모서리 블록 배경 (Graphics 사용)
+    const bg = this.add.graphics();
+    bg.fillStyle(blockColor, 1);
+    bg.fillRoundedRect(
+      -this.blockWidth / 2,
+      -this.blockHeight / 2,
+      this.blockWidth,
+      this.blockHeight,
+      radius
+    );
+
+    // 인터랙션용 히트 영역 (투명 사각형)
+    const hitArea = this.add
+      .rectangle(0, 0, this.blockWidth, this.blockHeight, 0x000000, 0)
+      .setInteractive({ useHandCursor: true, draggable: false });
+
+    // 숫자 (폰트 사이즈 증가)
     const text = this.add
       .text(0, 0, String(data.value), {
-        fontSize: '32px',
+        fontSize: '44px',
         fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
+        color: '#ffffff',
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
-    container.add([bg, text]);
-    container.setSize(this.blockWidth, this.blockHeight);
+    // 텍스트에 그림자 효과 추가
+    text.setShadow(2, 2, 'rgba(0,0,0,0.3)', 4);
 
-    // 인터랙션 설정
-    bg.setInteractive({ useHandCursor: true, draggable: false });
+    container.add([bg, hitArea, text]);
+    container.setSize(this.blockWidth, this.blockHeight);
 
     const blockSprite: BlockSprite = {
       data,
@@ -267,21 +291,28 @@ export class GameScene extends Phaser.Scene {
     };
 
     // pointerdown에서 블록 선택 및 스와이프 시작점 기록
-    bg.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    hitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying || blockSprite.isRemoving) return;
       this.selectedBlock = blockSprite;
       this.swipeStartX = pointer.x;
       this.swipeStartY = pointer.y;
       this.swipeStartTime = pointer.time;
 
-      // 선택 효과
-      bg.setFillStyle(COLORS.BLOCK_SELECTED);
+      // 선택 효과 (밝게)
+      bg.clear();
+      bg.fillStyle(COLORS.BLOCK_SELECTED, 1);
+      bg.fillRoundedRect(
+        -this.blockWidth / 2,
+        -this.blockHeight / 2,
+        this.blockWidth,
+        this.blockHeight,
+        radius
+      );
     });
 
-    // pointerout에서는 색상만 변경, selectedBlock은 유지 (전역 pointerup에서 처리)
-    bg.on('pointerout', () => {
-      // 드래그 중에는 색상 유지
-    });
+    // 선택 해제 시 원래 색상 복원을 위해 blockColor 저장
+    (container as any).originalColor = blockColor;
+    (container as any).bgGraphics = bg;
 
     return blockSprite;
   }
@@ -341,7 +372,7 @@ export class GameScene extends Phaser.Scene {
     const roundScore = baseScore * bonusMultiplier * difficultyBonus;
 
     this.score += roundScore;
-    this.scoreText.setText(`${this.score}점`);
+    this.topBar.updateValue('right', this.score);
 
     // 성공 효과
     this.showSuccessFeedback(roundScore);
@@ -475,11 +506,11 @@ export class GameScene extends Phaser.Scene {
     this.timeLeft -= 100;
 
     const seconds = Math.max(0, this.timeLeft / 1000);
-    this.timerText.setText(seconds.toFixed(1));
+    this.topBar.updateValue('left', parseFloat(seconds.toFixed(1)));
 
     // 10초 이하일 때 빨간색
     if (this.timeLeft <= 10000) {
-      this.timerText.setColor('#e94560');
+      this.topBar.setColor('left', '#e94560');
     }
 
     // 타임오버
@@ -499,9 +530,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleResize(gameSize: Phaser.Structs.Size): void {
-    // 필요 시 리사이즈 로직 추가
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
+
+    // 상단 바 리사이즈 대응
+    this.topBar?.handleResize(width);
+
+    // 난이도 텍스트 위치 조정
+    this.difficultyText?.setPosition(width - TOP_BAR.PADDING_X, TOP_BAR.HEIGHT + 5);
   }
 }
-

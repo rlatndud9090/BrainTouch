@@ -69,6 +69,7 @@ BrainTouch/
 │   │   ├── colors.ts               # 공통 색상 팔레트 + 테마 프리셋
 │   │   ├── constants.ts            # 공통 상수 (GAME_LAYOUT 등)
 │   │   ├── lives.ts                # 목숨 관리 (LivesManager 클래스)
+│   │   ├── topBar.ts               # 공통 상단 UI 바 (TopBar 클래스)
 │   │   └── ui.ts                   # 공통 UI 유틸리티 (버튼, 배경, 카운트다운, showStartScreen)
 │   └── games/
 │       ├── brain-touch/            # Brain Touch 게임 (숫자 터치)
@@ -172,11 +173,11 @@ BrainTouch/
 - Block Sum 게임 (블록셈 - 다루마 오토시 스타일 덧셈 퍼즐)
 - `DESIGN.md`: 게임 설계 문서
 - `config.ts`: Phaser 게임 설정
-- `scenes/GameScene.ts`: 메인 게임 씬 (블록 탑, 스와이프 제거, 낙하 애니메이션)
+- `scenes/GameScene.ts`: 메인 게임 씬 (블록 탑, 스와이프 제거, 둥근 모서리, 형형색색 블록)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/BlockGenerator.ts`: 블록 생성 및 목표 숫자 알고리즘
 - **규칙**: 블록을 스와이프로 제거하여 남은 블록 합 = 목표 숫자
-- **난이도**: 하(4개)→중(5개)→상(6개), 연속 3회 성공 시 승급
+- **난이도**: 하(4개, 1~5, 목표≤15)→중(5개, 1~9, 목표≤25)→상(5개, 1~9, 목표 무제한), 연속 3회 성공 시 승급
 - 상세 내용은 `src/games/block-sum/DESIGN.md` 참조
 
 ### `src/games/number-balloon/`
@@ -194,10 +195,11 @@ BrainTouch/
 ### `src/shared/`
 
 - 게임 간 공통 모듈
-- `colors.ts`: 공통 색상 팔레트 + 게임별 테마 프리셋 (BASE_COLORS, THEME_PRESETS)
+- `colors.ts`: 공통 색상 팔레트 + 게임별 테마 프리셋 (BASE_COLORS, THEME_PRESETS, COLORFUL_PALETTE)
 - `constants.ts`: 공통 상수 (GAME_LAYOUT 등)
 - `ui.ts`: 공통 UI 유틸리티 (버튼, 배경, 카운트다운, 시간 포맷, showStartScreen)
 - `lives.ts`: 목숨 관리 클래스 (LivesManager - 하트 표시, 목숨 증감, 게임오버 체크)
+- `topBar.ts`: 공통 상단 UI 바 (TopBar 클래스 - 점수/시간/하트/진행률/라운드 등 통일된 HUD 제공)
 
 ---
 
@@ -256,6 +258,7 @@ refactor/<game-name>-<description>
 - [x] 공통 모듈 분리 (colors.ts, ui.ts, lives.ts)
 - [x] showStartScreen 공통화 (Brain Touch, Speed Math, Math Flight, Block Sum, Number Balloon)
 - [x] LivesManager 공통화 (Brain Touch, Math Flight)
+- [x] TopBar 공통화 (전체 게임 상단 HUD 통일)
 
 ### 🔲 예정
 
@@ -294,6 +297,9 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2026-01-01 | TopBar 공통 컴포넌트 구현 및 전체 게임 적용 (상단 HUD 통일) |
+| 2026-01-01 | COLORFUL_PALETTE 공통화 (숫자풍선, 블록셈, 브레인터치) |
+| 2026-01-01 | Block Sum 난이도 리밸런스 + 블록 디자인 개선           |
 | 2025-12-28 | 공통 모듈 리팩토링 (showStartScreen, LivesManager 공통화) |
 | 2025-12-28 | Speed Math 모드선택 화면 제거, Home 버튼 수정          |
 | 2025-12-28 | Brain Touch 개선 (숫자 터치, 하트 시스템, ResultScene) |
@@ -316,4 +322,4 @@ refactor/<game-name>-<description>
 
 ---
 
-_마지막 업데이트: 2025-12-28 (리팩토링)_
+_마지막 업데이트: 2026-01-01 (TopBar 공통화)_

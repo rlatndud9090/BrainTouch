@@ -6,6 +6,8 @@ import {
   getRoundConfig,
 } from '../utils/BalloonGenerator';
 import { showStartScreen } from '../../../shared/ui';
+import { TopBar, TOP_BAR } from '../../../shared/topBar';
+import { BASE_COLORS } from '../../../shared/colors';
 
 // 게임 색상
 const COLORS = {
@@ -38,7 +40,6 @@ interface BalloonBody {
 export class GameScene extends Phaser.Scene {
   // 게임 상태
   private score = 0;
-  private lives = 3;
   private round = 1;
   private totalPopped = 0;
   private isPlaying = false;
@@ -50,9 +51,7 @@ export class GameScene extends Phaser.Scene {
   private currentIndex = 0;
 
   // UI 요소
-  private livesText!: Phaser.GameObjects.Text;
-  private scoreText!: Phaser.GameObjects.Text;
-  private roundText!: Phaser.GameObjects.Text;
+  private topBar!: TopBar;
   private instructionText!: Phaser.GameObjects.Text;
   private difficultyText!: Phaser.GameObjects.Text;
 
@@ -70,7 +69,6 @@ export class GameScene extends Phaser.Scene {
 
     // 상태 초기화
     this.score = 0;
-    this.lives = 3;
     this.round = 1;
     this.totalPopped = 0;
     this.isPlaying = false;
@@ -127,9 +125,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private calculateLayout(width: number, height: number): void {
-    const hudHeight = 80;
-    const instructionHeight = 50;
-    this.gameAreaTop = hudHeight + instructionHeight;
+    const hudHeight = TOP_BAR.HEIGHT;
+    const difficultyHeight = 25; // 난이도 텍스트 영역
+    const instructionHeight = 40;
+    this.gameAreaTop = hudHeight + difficultyHeight + instructionHeight;
     this.gameAreaWidth = width;
     this.gameAreaHeight = height - this.gameAreaTop - 20;
   }
@@ -184,49 +183,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHUD(width: number): void {
-    const hudY = 25;
+    // 공통 상단 바 생성 (배경 포함)
+    this.topBar = new TopBar(this, {
+      left: { type: 'lives', maxLives: 3 },
+      center: { type: 'round', initialValue: 1 },
+      right: { type: 'score', initialValue: 0, color: '#ffc947' },
+      showBackground: true,
+      backgroundColor: COLORS.HUD_BG,
+      backgroundAlpha: 0.9,
+    });
 
-    // HUD 배경
-    const hudBg = this.add.rectangle(width / 2, 40, width, 80, COLORS.HUD_BG, 0.9);
-    hudBg.setOrigin(0.5);
-
-    // 라이프 (왼쪽)
-    this.livesText = this.add
-      .text(20, hudY, '❤️❤️❤️', {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-      })
-      .setOrigin(0, 0.5);
-
-    // 라운드 (중앙)
-    this.roundText = this.add
-      .text(width / 2, hudY, 'Round 1', {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    // 점수 (오른쪽)
-    this.scoreText = this.add
-      .text(width - 20, hudY, '0점', {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#ffc947',
-        fontStyle: 'bold',
-      })
-      .setOrigin(1, 0.5);
-
-    // 난이도 표시
+    // 난이도 표시 (TopBar 바깥)
     const config = getRoundConfig(this.round);
     this.difficultyText = this.add
-      .text(width / 2, hudY + 25, `풍선 ${config.balloonCount}개`, {
+      .text(width / 2, TOP_BAR.HEIGHT + 10, `풍선 ${config.balloonCount}개`, {
         fontSize: '14px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(100);
   }
 
   private prepareRound(): void {
@@ -247,7 +223,7 @@ export class GameScene extends Phaser.Scene {
     this.createBalloonBodies();
 
     // UI 업데이트
-    this.roundText.setText(`Round ${this.round}`);
+    this.topBar.updateValue('center', this.round);
     const config = getRoundConfig(this.round);
     this.difficultyText.setText(`풍선 ${config.balloonCount}개`);
   }
@@ -350,7 +326,7 @@ export class GameScene extends Phaser.Scene {
     // 점수 추가
     const points = 10 * this.round;
     this.score += points;
-    this.scoreText.setText(`${this.score}점`);
+    this.topBar.updateValue('right', this.score);
 
     // 터지는 애니메이션
     this.popBalloon(balloon, true);
@@ -362,14 +338,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleWrongTap(balloon: BalloonBody): void {
-    this.lives--;
-    this.updateLivesDisplay();
+    // TopBar의 LivesManager를 통해 목숨 감소
+    const isGameOver = this.topBar.loseLife('left');
 
     // 틀린 피드백
     this.showWrongFeedback(balloon);
 
     // 게임 오버 체크
-    if (this.lives <= 0) {
+    if (isGameOver) {
       this.endGame();
     }
   }
@@ -462,10 +438,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private updateLivesDisplay(): void {
-    const hearts = '❤️'.repeat(this.lives) + '🖤'.repeat(3 - this.lives);
-    this.livesText.setText(hearts);
-  }
 
   private handleRoundClear(): void {
     this.round++;
@@ -515,5 +487,11 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
     this.setupWorldBounds(width, height);
+
+    // 상단 바 리사이즈 대응
+    this.topBar?.handleResize(width);
+
+    // 난이도 텍스트 위치 조정
+    this.difficultyText?.setPosition(width / 2, TOP_BAR.HEIGHT + 10);
   }
 }

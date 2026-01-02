@@ -125,6 +125,13 @@ export class LivesManager {
   }
 
   /**
+   * 알파값 설정 (페이드인/아웃용)
+   */
+  setAlpha(alpha: number): void {
+    this.container.setAlpha(alpha);
+  }
+
+  /**
    * 정리 (씬 전환 시)
    */
   destroy(): void {
