@@ -3,6 +3,8 @@
  * 형님 알고리즘: 정렬 기반 매칭 + 난이도별 index 교환
  */
 
+import { COLORFUL_PALETTE } from '../../../shared/colors';
+
 export interface BalloonData {
   id: number;
   value: number; // 풍선에 적힌 숫자
@@ -20,17 +22,8 @@ export interface RoundConfig {
   maxNumber: number; // 숫자 범위 최대
 }
 
-// 풍선 색상 팔레트 (이미지 참고)
-const BALLOON_COLORS = [
-  0xff69b4, // 핑크
-  0x4fc3f7, // 하늘색
-  0xff7043, // 주황
-  0x81c784, // 초록
-  0xef5350, // 빨강
-  0xffee58, // 노랑
-  0xba68c8, // 보라
-  0x4dd0e1, // 민트
-];
+// 풍선 색상 팔레트 (공통 팔레트 사용)
+const BALLOON_COLORS = COLORFUL_PALETTE;
 
 // 풍선 크기 범위
 const MIN_SIZE = 40;
