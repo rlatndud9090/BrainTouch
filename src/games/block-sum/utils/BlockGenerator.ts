@@ -20,9 +20,10 @@ const DIFFICULTY_CONFIG = {
   easy: {
     blockCount: 4,
     minValue: 1,
-    maxValue: 9,
+    maxValue: 5, // 쉬움: 1~5만
     maxRemove: 2, // 최대 2개까지만 제거
     preferRemove: 1, // 주로 1개 제거 (가중치)
+    maxTargetSum: 15, // 목표 숫자 최대값
   },
   normal: {
     blockCount: 5,
@@ -30,13 +31,15 @@ const DIFFICULTY_CONFIG = {
     maxValue: 9,
     maxRemove: 2, // 최대 2개까지만 제거
     preferRemove: 1, // 주로 1개 제거 (가중치)
+    maxTargetSum: 25, // 목표 숫자 최대값
   },
   hard: {
-    blockCount: 6,
+    blockCount: 5, // 어려움도 5개로 고정
     minValue: 1,
     maxValue: 9,
     maxRemove: 2, // 최대 2개까지만 제거
     preferRemove: 1, // 주로 1개 제거 (가중치)
+    maxTargetSum: null, // 제한 없음
   },
 } as const;
 
@@ -100,16 +103,17 @@ export function generateRound(difficulty: Difficulty): RoundData {
   // 가능한 모든 합 계산
   const possibleSums = getAllPossibleSums(blocks);
 
-  // 가능한 목표 합 중 하나 선택 (제거 개수 제한 적용)
-  const totalSum = blocks.reduce((sum, b) => sum + b.value, 0);
-
-  // maxRemove 이하로 제거하는 목표만 필터링
+  // maxRemove 이하로 제거하는 목표만 필터링 + 목표 숫자 제한 적용
   const validTargets: { sum: number; removeCount: number }[] = [];
+  const maxTargetSum = config.maxTargetSum;
   for (const [sum, removedIndices] of possibleSums.entries()) {
     const removeCount = removedIndices.length;
     // 최소 1개는 제거해야 하고, maxRemove 이하만 허용
+    // 목표 숫자가 maxTargetSum 이하인지 체크 (null이면 제한 없음)
     if (removeCount >= 1 && removeCount <= config.maxRemove && sum > 0) {
-      validTargets.push({ sum, removeCount });
+      if (maxTargetSum === null || sum <= maxTargetSum) {
+        validTargets.push({ sum, removeCount });
+      }
     }
   }
 

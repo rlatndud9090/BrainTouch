@@ -43,6 +43,18 @@ export const BASE_COLORS = {
   HUD_BG: 0x2c3e50,
 } as const;
 
+// 공통 컬러풀 팔레트 (풍선, 블록, 원 등 다양한 곳에서 사용)
+export const COLORFUL_PALETTE = [
+  0xff69b4, // 핑크
+  0x4fc3f7, // 하늘색
+  0xff7043, // 주황
+  0x81c784, // 초록
+  0xef5350, // 빨강
+  0xffee58, // 노랑
+  0xba68c8, // 보라
+  0x4dd0e1, // 민트
+] as const;
+
 // 게임별 테마 색상 프리셋
 export const THEME_PRESETS = {
   // Brain Touch - 핑크/레드 계열
