@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { FONTS } from '../../../shared/constants';
 
 // 색상 상수
 const COLORS = {
@@ -58,14 +59,13 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 기록 시간
+    // 기록 시간 (숫자만 Cherry Bomb One 폰트)
     const timeSeconds = (this.totalTime / 1000).toFixed(2);
     this.add
-      .text(width / 2, height * 0.45, `${timeSeconds}초`, {
+      .text(width / 2, height * 0.45, `${timeSeconds}`, {
         fontSize: '72px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: '#4ecca3',
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 

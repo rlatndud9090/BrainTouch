@@ -8,6 +8,7 @@ import {
 import { showStartScreen } from '../../../shared/ui';
 import { TopBar, TOP_BAR } from '../../../shared/topBar';
 import { BASE_COLORS } from '../../../shared/colors';
+import { FONTS } from '../../../shared/constants';
 
 // 게임 색상
 const COLORS = {
@@ -18,7 +19,36 @@ const COLORS = {
   HUD_BG: 0x2c3e50,
   SUCCESS: 0x4ecca3,
   FAIL: 0xe94560,
+  TIME_WARNING: '#c0392b', // 어두운 빨간색 (하늘 배경용)
+  TIME_NORMAL: '#2c3e50', // 어두운 색 (하늘 배경용)
 };
+
+// ========================================
+// 🎮 라운드 제한시간 설정 (초 단위)
+// 형님이 테스트 후 조정하기 쉽게 분리
+// ========================================
+const ROUND_TIME_CONFIG = {
+  // 초반 (1~3 라운드): 여유롭게
+  EARLY: 10,
+  // 중반 (4~7 라운드): 보통
+  MID: 8,
+  // 후반 (8+ 라운드): 빠르게
+  LATE: 6,
+  // 라운드 구간 기준
+  EARLY_THRESHOLD: 4,
+  MID_THRESHOLD: 8,
+} as const;
+
+// 라운드에 따른 제한시간 반환
+function getRoundTimeLimit(round: number): number {
+  if (round < ROUND_TIME_CONFIG.EARLY_THRESHOLD) {
+    return ROUND_TIME_CONFIG.EARLY;
+  } else if (round < ROUND_TIME_CONFIG.MID_THRESHOLD) {
+    return ROUND_TIME_CONFIG.MID;
+  } else {
+    return ROUND_TIME_CONFIG.LATE;
+  }
+}
 
 // 풍선 물리 설정
 const BALLOON_PHYSICS = {
@@ -44,6 +74,11 @@ export class GameScene extends Phaser.Scene {
   private totalPopped = 0;
   private isPlaying = false;
 
+  // 라운드 타이머
+  private roundTimeLimit = 0; // 현재 라운드 제한시간 (초)
+  private roundTimeLeft = 0; // 남은 시간 (ms)
+  private roundTimerEvent?: Phaser.Time.TimerEvent;
+
   // 현재 라운드
   private balloons: BalloonData[] = [];
   private balloonBodies: BalloonBody[] = [];
@@ -53,7 +88,6 @@ export class GameScene extends Phaser.Scene {
   // UI 요소
   private topBar!: TopBar;
   private instructionText!: Phaser.GameObjects.Text;
-  private difficultyText!: Phaser.GameObjects.Text;
 
   // 게임 영역
   private gameAreaWidth = 0;
@@ -74,6 +108,8 @@ export class GameScene extends Phaser.Scene {
     this.isPlaying = false;
     this.balloonBodies = [];
     this.currentIndex = 0;
+    this.roundTimeLimit = 0;
+    this.roundTimeLeft = 0;
 
     // 레이아웃 계산
     this.calculateLayout(width, height);
@@ -183,29 +219,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHUD(width: number): void {
-    // 공통 상단 바 생성 (배경 포함)
+    // 공통 상단 바 생성: 하트 | 라운드 시간 | 점수 (배경 없음, 어두운 색상)
     this.topBar = new TopBar(this, {
       left: { type: 'lives', maxLives: 3 },
-      center: { type: 'round', initialValue: 1 },
-      right: { type: 'score', initialValue: 0, color: '#ffc947' },
-      showBackground: true,
-      backgroundColor: COLORS.HUD_BG,
-      backgroundAlpha: 0.9,
+      center: { type: 'time', initialValue: 10, color: COLORS.TEXT_DARK },
+      right: { type: 'score', initialValue: 0, color: COLORS.TEXT_DARK },
     });
-
-    // 난이도 표시 (TopBar 바깥)
-    const config = getRoundConfig(this.round);
-    this.difficultyText = this.add
-      .text(width / 2, TOP_BAR.HEIGHT + 10, `풍선 ${config.balloonCount}개`, {
-        fontSize: '14px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(0.5)
-      .setDepth(100);
   }
 
   private prepareRound(): void {
+    // 기존 타이머 정리
+    this.roundTimerEvent?.destroy();
+
     // 기존 풍선 제거
     this.balloonBodies.forEach((balloon) => {
       this.matter.world.remove(balloon.body);
@@ -222,10 +247,14 @@ export class GameScene extends Phaser.Scene {
     // 풍선 물리 바디 생성
     this.createBalloonBodies();
 
-    // UI 업데이트
-    this.topBar.updateValue('center', this.round);
-    const config = getRoundConfig(this.round);
-    this.difficultyText.setText(`풍선 ${config.balloonCount}개`);
+    // 라운드 타이머 설정
+    this.roundTimeLimit = getRoundTimeLimit(this.round);
+    this.roundTimeLeft = this.roundTimeLimit * 1000;
+    this.topBar.updateValue('center', this.roundTimeLimit);
+    this.topBar.setColor('center', COLORS.TIME_NORMAL); // 색상 리셋
+
+    // 라운드 타이머 시작
+    this.startRoundTimer();
   }
 
   private createBalloonBodies(): void {
@@ -257,14 +286,13 @@ export class GameScene extends Phaser.Scene {
     this.drawBalloon(graphics, data);
     graphics.setPosition(data.x, data.y + this.gameAreaTop);
 
-    // 숫자 텍스트
-    const fontSize = Math.max(data.size * 0.6, 20);
+    // 숫자 텍스트 (Cherry Bomb One 폰트)
+    const fontSize = Math.max(data.size * 0.65, 22);
     const text = this.add
       .text(data.x, data.y + this.gameAreaTop, String(data.value), {
         fontSize: `${fontSize}px`,
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: '#ffffff',
-        fontStyle: 'bold',
         stroke: '#000000',
         strokeThickness: 2,
       })
@@ -338,7 +366,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleWrongTap(balloon: BalloonBody): void {
-    // TopBar의 LivesManager를 통해 목숨 감소
+    // 하트 감소 (타이머는 계속 진행)
     const isGameOver = this.topBar.loseLife('left');
 
     // 틀린 피드백
@@ -346,8 +374,12 @@ export class GameScene extends Phaser.Scene {
 
     // 게임 오버 체크
     if (isGameOver) {
-      this.endGame();
+      this.roundTimerEvent?.destroy();
+      this.time.delayedCall(500, () => {
+        this.endGame();
+      });
     }
+    // 게임 오버가 아니면 풍선은 그대로, 타이머도 계속 진행
   }
 
   private popBalloon(balloon: BalloonBody, success: boolean): void {
@@ -440,6 +472,9 @@ export class GameScene extends Phaser.Scene {
 
 
   private handleRoundClear(): void {
+    // 타이머 정지
+    this.roundTimerEvent?.destroy();
+
     this.round++;
 
     // 라운드 클리어 표시
@@ -473,6 +508,88 @@ export class GameScene extends Phaser.Scene {
     this.prepareRound();
   }
 
+  private startRoundTimer(): void {
+    if (!this.isPlaying) return;
+
+    this.roundTimerEvent = this.time.addEvent({
+      delay: 100,
+      callback: this.updateRoundTimer,
+      callbackScope: this,
+      loop: true,
+    });
+  }
+
+  private updateRoundTimer(): void {
+    if (!this.isPlaying) return;
+
+    this.roundTimeLeft -= 100;
+
+    const seconds = Math.max(0, this.roundTimeLeft / 1000);
+    this.topBar.updateValue('center', parseFloat(seconds.toFixed(1)));
+
+    // 3초 이하일 때 빨간색
+    if (this.roundTimeLeft <= 3000) {
+      this.topBar.setColor('center', COLORS.TIME_WARNING);
+    }
+
+    // 시간 초과 = 하트 감소
+    if (this.roundTimeLeft <= 0) {
+      this.handleTimeOut();
+    }
+  }
+
+  private handleTimeOut(): void {
+    // 타이머 정지
+    this.roundTimerEvent?.destroy();
+
+    // 하트 감소
+    const isGameOver = this.topBar.loseLife('left');
+
+    // 시간 초과 피드백
+    this.showTimeOutFeedback();
+
+    // 게임 오버 체크
+    if (isGameOver) {
+      this.time.delayedCall(800, () => {
+        this.endGame();
+      });
+      return;
+    }
+
+    // 같은 라운드 재시작 (풍선 재배치)
+    this.time.delayedCall(800, () => {
+      if (this.isPlaying) {
+        this.prepareRound();
+      }
+    });
+  }
+
+  private showTimeOutFeedback(): void {
+    const { width, height } = this.scale;
+
+    // 화면 흔들기
+    this.cameras.main.shake(200, 0.01);
+
+    const text = this.add
+      .text(width / 2, height / 2, '⏱️ 시간 초과!', {
+        fontSize: '36px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#e94560',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: text,
+      alpha: 1,
+      duration: 200,
+      yoyo: true,
+      hold: 400,
+      onComplete: () => text.destroy(),
+    });
+  }
+
   private endGame(): void {
     this.isPlaying = false;
 
@@ -490,8 +607,5 @@ export class GameScene extends Phaser.Scene {
 
     // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);
-
-    // 난이도 텍스트 위치 조정
-    this.difficultyText?.setPosition(width / 2, TOP_BAR.HEIGHT + 10);
   }
 }

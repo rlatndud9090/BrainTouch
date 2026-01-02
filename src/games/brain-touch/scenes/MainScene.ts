@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { THEME_PRESETS, COLORFUL_PALETTE } from '../../../shared/colors';
 import { createGradientBackground, showStartScreen } from '../../../shared/ui';
 import { TopBar, TOP_BAR } from '../../../shared/topBar';
+import { FONTS } from '../../../shared/constants';
 
 const THEME = THEME_PRESETS.brainTouch;
 
@@ -218,13 +219,12 @@ export class MainScene extends Phaser.Scene {
     const circle = this.add.circle(0, 0, radius, color);
     circle.setStrokeStyle(3, 0xffffff, 0.3);
 
-    // 숫자 텍스트
+    // 숫자 텍스트 (Cherry Bomb One 폰트)
     const text = this.add
       .text(0, 0, requiredTaps.toString(), {
-        fontSize: `${Math.floor(radius * 0.9)}px`,
-        fontFamily: 'Pretendard, sans-serif',
+        fontSize: `${Math.floor(radius * 0.95)}px`,
+        fontFamily: FONTS.NUMBER,
         color: '#ffffff',
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 

@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { BASE_COLORS } from './colors';
+import { FONTS } from './constants';
 
 /**
  * 그라데이션 배경 생성
@@ -128,9 +129,8 @@ export function playCountdown(
   const countdownText = scene.add
     .text(x, y, '3', {
       fontSize,
-      fontFamily: 'Pretendard, sans-serif',
+      fontFamily: FONTS.NUMBER,
       color,
-      fontStyle: 'bold',
     })
     .setOrigin(0.5)
     .setAlpha(0);

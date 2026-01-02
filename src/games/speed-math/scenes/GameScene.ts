@@ -3,6 +3,7 @@ import { Question, generateQuestions, isSingleDigitAnswer } from '../utils/Quest
 import { showStartScreen } from '../../../shared/ui';
 import { TopBar, TOP_BAR } from '../../../shared/topBar';
 import { BASE_COLORS } from '../../../shared/colors';
+import { FONTS } from '../../../shared/constants';
 
 // 색상 상수
 const COLORS = {
@@ -70,10 +71,9 @@ export class GameScene extends Phaser.Scene {
     // 문제 표시 (아직 보이지 않음)
     this.updateQuestionDisplay();
 
-    // 처음에는 게임 영역 숨김
+    // 처음에는 게임 영역 숨김 (topBar는 보임)
     this.questionContainer.setAlpha(0);
     this.padContainer.setAlpha(0);
-    this.topBar.setAlpha(0);
 
     // 시작 화면 표시
     showStartScreen(this, {
@@ -92,11 +92,10 @@ export class GameScene extends Phaser.Scene {
   private showGameUI(): void {
     // 게임 UI 페이드인
     this.tweens.add({
-      targets: [this.questionContainer, this.padContainer, this.topBar.getContainer()],
+      targets: [this.questionContainer, this.padContainer],
       alpha: 1,
       duration: 200,
     });
-    this.topBar.setAlpha(1);
   }
 
   private createBackground(width: number, height: number): void {
@@ -125,23 +124,21 @@ export class GameScene extends Phaser.Scene {
 
     this.questionContainer = this.add.container(0, questionAreaY);
 
-    // 현재 문제 (가장 크게, 강조)
+    // 현재 문제 (가장 크게, 강조 - Cherry Bomb One 폰트)
     const currentY = questionAreaHeight * 0.25;
     this.currentQuestionText = this.add
       .text(width / 2, currentY, '', {
-        fontSize: '36px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontSize: '38px',
+        fontFamily: FONTS.NUMBER,
         color: COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
       })
       .setOrigin(1, 0.5);
 
     this.currentAnswerText = this.add
       .text(width / 2 + 8, currentY, '[__]', {
-        fontSize: '36px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontSize: '38px',
+        fontFamily: FONTS.NUMBER,
         color: '#ffc947',
-        fontStyle: 'bold',
       })
       .setOrigin(0, 0.5);
 
@@ -150,22 +147,22 @@ export class GameScene extends Phaser.Scene {
     divider.lineStyle(1, 0x4a4a6e, 0.5);
     divider.lineBetween(width * 0.15, currentY + 35, width * 0.85, currentY + 35);
 
-    // 다음 문제 (중간 크기)
+    // 다음 문제 (중간 크기 - Cherry Bomb One 폰트)
     const nextY = questionAreaHeight * 0.55;
     this.nextQuestionText = this.add
       .text(width / 2, nextY, '', {
-        fontSize: '28px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontSize: '30px',
+        fontFamily: FONTS.NUMBER,
         color: COLORS.TEXT_SECONDARY,
       })
       .setOrigin(0.5, 0.5);
 
-    // 그다음 문제 (작고 흐리게)
+    // 그다음 문제 (작고 흐리게 - Cherry Bomb One 폰트)
     const nextNextY = questionAreaHeight * 0.8;
     this.nextNextQuestionText = this.add
       .text(width / 2, nextNextY, '', {
-        fontSize: '22px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontSize: '24px',
+        fontFamily: FONTS.NUMBER,
         color: COLORS.TEXT_DIM,
       })
       .setOrigin(0.5, 0.5);
@@ -230,14 +227,14 @@ export class GameScene extends Phaser.Scene {
     const bg = this.add.rectangle(0, 0, size, size, COLORS.PAD_BG).setStrokeStyle(2, 0x4a4a6e);
     bg.setInteractive({ useHandCursor: true });
 
-    // 버튼 텍스트
-    const fontSize = Math.max(size * 0.4, 24);
+    // 버튼 텍스트 (숫자는 Cherry Bomb One, C는 기본 폰트)
+    const fontSize = Math.max(size * 0.45, 26);
+    const isNumber = !isNaN(Number(label)) || label === '-';
     const text = this.add
       .text(0, 0, label, {
         fontSize: `${fontSize}px`,
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: isNumber ? FONTS.NUMBER : FONTS.DEFAULT,
         color: label === 'C' ? '#e94560' : COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 

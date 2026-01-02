@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
 import { createGradientBackground, createButton } from '../../../shared/ui';
+import { FONTS } from '../../../shared/constants';
 
 const THEME = THEME_PRESETS.brainTouch;
 
@@ -48,13 +49,12 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 점수 표시 (애니메이션)
+    // 점수 표시 (애니메이션 - Cherry Bomb One 폰트)
     const scoreText = this.add
       .text(width / 2, height * 0.5, '0', {
         fontSize: '64px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: THEME.accentText,
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 

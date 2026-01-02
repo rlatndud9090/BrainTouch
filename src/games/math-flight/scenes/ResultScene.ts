@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { FONTS } from '../../../shared/constants';
 
 // 색상 상수
 const COLORS = {
@@ -67,9 +68,8 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(width / 2, height * 0.33, `${this.totalScore}`, {
         fontSize: '64px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: '#00d4ff',
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 

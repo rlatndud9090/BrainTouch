@@ -9,14 +9,15 @@ import { LivesManager } from './lives';
 
 // 상단 바 레이아웃 상수
 export const TOP_BAR = {
-  HEIGHT: 50, // 상단 바 높이
+  HEIGHT: 56, // 상단 바 높이 (하트 이모지 잘림 방지)
   PADDING_X: 16, // 좌우 패딩
-  CENTER_Y: 25, // 중앙 Y 좌표 (HEIGHT / 2)
+  CENTER_Y: 30, // 중앙 Y 좌표
   FONT_SIZE: {
-    MAIN: '22px', // 주요 요소 (점수, 시간 등)
+    MAIN: '24px', // 주요 요소 (점수, 시간 등) - Cherry Bomb One은 살짝 크게
     SUB: '14px', // 부가 요소 (라벨 등)
   },
-  FONT_FAMILY: 'Pretendard, sans-serif',
+  FONT_FAMILY: '"Cherry Bomb One", cursive', // 숫자 전용 폰트
+  FONT_FAMILY_LABEL: 'Pretendard, sans-serif', // 한글 라벨용 폰트
 } as const;
 
 // 슬롯 위치
@@ -140,7 +141,7 @@ export class TopBar {
       item.valueText = valueText;
       slotContainer.add(valueText);
 
-      // 라벨 (선택적)
+      // 라벨 (선택적) - 한글이므로 Pretendard 사용
       if (config.showLabel && config.label) {
         const labelX = position === 'left' ? x : position === 'right' ? x : x;
         const labelY = TOP_BAR.CENTER_Y + 18;
@@ -148,7 +149,7 @@ export class TopBar {
         const labelText = this.scene.add
           .text(labelX, labelY, config.label, {
             fontSize: TOP_BAR.FONT_SIZE.SUB,
-            fontFamily: TOP_BAR.FONT_FAMILY,
+            fontFamily: TOP_BAR.FONT_FAMILY_LABEL,
             color: BASE_COLORS.TEXT_SECONDARY,
           })
           .setOrigin(originX, 0.5);
@@ -177,13 +178,13 @@ export class TopBar {
     if (value === undefined || value === null) {
       switch (type) {
         case 'score':
-          return '0점';
+          return '0';
         case 'time':
-          return '0초';
+          return '0';
         case 'progress':
           return '0/0';
         case 'round':
-          return 'Round 1';
+          return '1';
         default:
           return '';
       }
@@ -191,17 +192,17 @@ export class TopBar {
 
     switch (type) {
       case 'score':
-        return `${value}점`;
+        return `${value}`;
       case 'time':
         if (typeof value === 'number') {
           // 소수점 여부에 따라 포맷팅
-          return Number.isInteger(value) ? `${value}초` : `${value.toFixed(1)}초`;
+          return Number.isInteger(value) ? `${value}` : `${value.toFixed(1)}`;
         }
         return `${value}`;
       case 'progress':
         return String(value);
       case 'round':
-        return typeof value === 'number' ? `Round ${value}` : String(value);
+        return typeof value === 'number' ? `${value}` : String(value);
       default:
         return String(value);
     }

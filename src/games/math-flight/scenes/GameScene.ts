@@ -11,6 +11,7 @@ import {
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
 import { showStartScreen } from '../../../shared/ui';
 import { TopBar, TOP_BAR } from '../../../shared/topBar';
+import { FONTS } from '../../../shared/constants';
 
 const THEME = THEME_PRESETS.mathFlight;
 
@@ -145,10 +146,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHUD(): void {
-    // 공통 상단 바 생성
+    // 공통 상단 바 생성: 하트 | - | 점수 (다른 게임과 통일)
     this.topBar = new TopBar(this, {
-      left: { type: 'score', initialValue: 0 },
-      right: { type: 'lives', maxLives: 3 },
+      left: { type: 'lives', maxLives: 3 },
+      right: { type: 'score', initialValue: 0 },
+      showBackground: true,
+      backgroundColor: 0x000000,
+      backgroundAlpha: 0.3, // 반투명 배경으로 별과 겹쳐도 가독성 유지
     });
   }
 
@@ -240,14 +244,13 @@ export class GameScene extends Phaser.Scene {
     // 운석 배경 (레인 너비에 맞춘 크기)
     const bg = this.add.circle(0, 0, this.meteorRadius, THEME.meteorNormal);
 
-    // 숫자 텍스트 (운석 크기에 비례, 고해상도)
-    const fontSize = Math.max(16, Math.floor(this.meteorRadius * 0.7));
+    // 숫자 텍스트 (Cherry Bomb One 폰트)
+    const fontSize = Math.max(18, Math.floor(this.meteorRadius * 0.75));
     const text = this.add
       .text(0, 0, data.value.toString(), {
         fontSize: `${fontSize}px`,
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: '#ffffff',
-        fontStyle: 'bold',
       })
       .setOrigin(0.5)
       .setResolution(2); // 고해상도 렌더링으로 블러 방지
@@ -363,7 +366,7 @@ export class GameScene extends Phaser.Scene {
       this.showSuccessEffect(meteor, earnedScore, isMedianMeteor(type));
     } else {
       // 실패 (min 또는 max)
-      const isGameOver = this.topBar.loseLife('right');
+      const isGameOver = this.topBar.loseLife('left');
       this.showFailEffect();
 
       if (isGameOver) {
@@ -372,7 +375,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.topBar.updateValue('left', this.score);
+    this.topBar.updateValue('right', this.score);
   }
 
   private showSuccessEffect(meteor: MeteorSprite, score: number, isMedian: boolean): void {
@@ -437,7 +440,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateScoreDisplay(): void {
-    this.topBar.updateValue('left', this.score);
+    this.topBar.updateValue('right', this.score);
   }
 
   private checkNextWave(): void {
