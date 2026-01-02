@@ -10,7 +10,7 @@ import {
 } from '../utils/MeteorGenerator';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
 import { showStartScreen } from '../../../shared/ui';
-import { LivesManager } from '../../../shared/lives';
+import { TopBar, TOP_BAR } from '../../../shared/topBar';
 
 const THEME = THEME_PRESETS.mathFlight;
 
@@ -40,8 +40,7 @@ export class GameScene extends Phaser.Scene {
   private isPointerDown = false; // 드래그 상태 추적
 
   // UI 요소
-  private livesManager!: LivesManager;
-  private scoreText!: Phaser.GameObjects.Text;
+  private topBar!: TopBar;
   private player!: Phaser.GameObjects.Container;
 
   // 운석
@@ -76,7 +75,7 @@ export class GameScene extends Phaser.Scene {
     this.createLaneLines(width, height);
 
     // HUD
-    this.createHUD(width);
+    this.createHUD();
 
     // 플레이어
     this.createPlayer();
@@ -145,23 +144,11 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private createHUD(width: number): void {
-    // 점수 (좌상단)
-    this.scoreText = this.add
-      .text(16, 16, '0점', {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: BASE_COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0, 0);
-
-    // 라이프 (우상단)
-    this.livesManager = new LivesManager(this, {
-      x: width - 60,
-      y: 16,
-      maxLives: 3,
-      align: 'right',
+  private createHUD(): void {
+    // 공통 상단 바 생성
+    this.topBar = new TopBar(this, {
+      left: { type: 'score', initialValue: 0 },
+      right: { type: 'lives', maxLives: 3 },
     });
   }
 
@@ -376,7 +363,7 @@ export class GameScene extends Phaser.Scene {
       this.showSuccessEffect(meteor, earnedScore, isMedianMeteor(type));
     } else {
       // 실패 (min 또는 max)
-      const isGameOver = this.livesManager.loseLife();
+      const isGameOver = this.topBar.loseLife('right');
       this.showFailEffect();
 
       if (isGameOver) {
@@ -385,7 +372,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.scoreText.setText(`${this.score}점`);
+    this.topBar.updateValue('left', this.score);
   }
 
   private showSuccessEffect(meteor: MeteorSprite, score: number, isMedian: boolean): void {
@@ -450,7 +437,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateScoreDisplay(): void {
-    this.scoreText.setText(`${this.score}점`);
+    this.topBar.updateValue('left', this.score);
   }
 
   private checkNextWave(): void {
@@ -486,7 +473,7 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
 
-    this.livesManager?.setPosition(width - 60, 16);
+    this.topBar?.handleResize(width);
 
     if (this.player) {
       this.playerX = Phaser.Math.Clamp(this.playerX, 30, width - 30);

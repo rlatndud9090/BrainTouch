@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { THEME_PRESETS } from '../../../shared/colors';
+import { THEME_PRESETS, COLORFUL_PALETTE } from '../../../shared/colors';
 import { createGradientBackground, showStartScreen } from '../../../shared/ui';
-import { LivesManager } from '../../../shared/lives';
+import { TopBar, TOP_BAR } from '../../../shared/topBar';
 
 const THEME = THEME_PRESETS.brainTouch;
 
@@ -28,9 +28,7 @@ export class MainScene extends Phaser.Scene {
   private readonly HIT_AREA_MULTIPLIER = 1.4; // 터치 허용 범위 확장
 
   // UI 요소
-  private scoreText!: Phaser.GameObjects.Text;
-  private timerText!: Phaser.GameObjects.Text;
-  private livesManager!: LivesManager;
+  private topBar!: TopBar;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -53,34 +51,11 @@ export class MainScene extends Phaser.Scene {
   }
 
   private createUI(): void {
-    const { width } = this.scale;
-
-    // 점수 텍스트
-    this.scoreText = this.add
-      .text(20, 20, '점수: 0', {
-        fontSize: '22px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: THEME.accentText,
-        fontStyle: 'bold',
-      })
-      .setDepth(100);
-
-    // 타이머 텍스트
-    this.timerText = this.add
-      .text(width - 20, 20, `${this.timeLeft}초`, {
-        fontSize: '22px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#4ecca3',
-        fontStyle: 'bold',
-      })
-      .setOrigin(1, 0)
-      .setDepth(100);
-
-    // 하트(라이프) 매니저
-    this.livesManager = new LivesManager(this, {
-      x: width / 2,
-      y: 25,
-      maxLives: 3,
+    // 공통 상단 바 생성
+    this.topBar = new TopBar(this, {
+      left: { type: 'score', initialValue: 0, color: THEME.accentText },
+      center: { type: 'lives', maxLives: 3 },
+      right: { type: 'time', initialValue: this.timeLeft, color: '#4ecca3' },
     });
   }
 
@@ -97,8 +72,8 @@ export class MainScene extends Phaser.Scene {
     this.score = 0;
     this.timeLeft = 30;
 
-    this.scoreText.setText('점수: 0');
-    this.livesManager.reset();
+    this.topBar.updateValue('left', 0);
+    this.topBar.resetLives('center');
 
     // 첫 번째 타겟 생성
     this.spawnTarget();
@@ -156,7 +131,7 @@ export class MainScene extends Phaser.Scene {
       // 원 완료 - 점수 획득
       const bonusMultiplier = this.target.requiredTaps; // 큰 숫자일수록 보너스
       this.score += 10 * bonusMultiplier;
-      this.scoreText.setText(`점수: ${this.score}`);
+      this.topBar.updateValue('left', this.score);
 
       // 사라지는 원의 hitArea 저장 (빈 곳 터치 판정용)
       this.fadingHitArea = this.target.hitArea;
@@ -195,7 +170,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   private loseLife(): void {
-    const isGameOver = this.livesManager.loseLife();
+    const isGameOver = this.topBar.loseLife('center');
 
     // 화면 흔들림 효과
     this.cameras.main.shake(100, 0.01);
@@ -235,9 +210,9 @@ export class MainScene extends Phaser.Scene {
     const scale = 0.8 + requiredTaps * 0.1;
     const radius = this.BASE_RADIUS * scale;
 
-    // 랜덤 색상
-    const colorIndex = Phaser.Math.Between(0, THEME.circleColors.length - 1);
-    const color = THEME.circleColors[colorIndex];
+    // 랜덤 색상 (공통 팔레트 사용)
+    const colorIndex = Phaser.Math.Between(0, COLORFUL_PALETTE.length - 1);
+    const color = COLORFUL_PALETTE[colorIndex];
 
     // 원 생성
     const circle = this.add.circle(0, 0, radius, color);
@@ -284,11 +259,11 @@ export class MainScene extends Phaser.Scene {
 
   private updateTimer(): void {
     this.timeLeft--;
-    this.timerText.setText(`${this.timeLeft}초`);
+    this.topBar.updateValue('right', this.timeLeft);
 
     // 10초 이하일 때 빨간색으로
     if (this.timeLeft <= 10) {
-      this.timerText.setColor('#e94560');
+      this.topBar.setColor('right', '#e94560');
     }
 
     if (this.timeLeft <= 0) {
@@ -318,9 +293,8 @@ export class MainScene extends Phaser.Scene {
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width } = gameSize;
 
-    // UI 위치 조정
-    this.timerText?.setPosition(width - 20, 20);
-    this.livesManager?.setPosition(width / 2, 25);
+    // 상단 바 리사이즈 대응
+    this.topBar?.handleResize(width);
   }
 
   update(): void {

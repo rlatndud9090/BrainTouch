@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { Question, generateQuestions, isSingleDigitAnswer } from '../utils/QuestionGenerator';
 import { showStartScreen } from '../../../shared/ui';
+import { TopBar, TOP_BAR } from '../../../shared/topBar';
+import { BASE_COLORS } from '../../../shared/colors';
 
 // 색상 상수
 const COLORS = {
@@ -26,8 +28,7 @@ export class GameScene extends Phaser.Scene {
   private isPlaying = false;
 
   // UI 요소
-  private timerText!: Phaser.GameObjects.Text;
-  private progressText!: Phaser.GameObjects.Text;
+  private topBar!: TopBar;
 
   // 문제 표시 (3개)
   private questionContainer!: Phaser.GameObjects.Container;
@@ -58,7 +59,7 @@ export class GameScene extends Phaser.Scene {
     this.createBackground(width, height);
 
     // HUD (진행률, 타이머)
-    this.createHUD(width);
+    this.createHUD();
 
     // 문제 영역 (3개 문제 표시)
     this.createQuestionArea(width, height);
@@ -72,8 +73,7 @@ export class GameScene extends Phaser.Scene {
     // 처음에는 게임 영역 숨김
     this.questionContainer.setAlpha(0);
     this.padContainer.setAlpha(0);
-    this.progressText.setAlpha(0);
-    this.timerText.setAlpha(0);
+    this.topBar.setAlpha(0);
 
     // 시작 화면 표시
     showStartScreen(this, {
@@ -92,10 +92,11 @@ export class GameScene extends Phaser.Scene {
   private showGameUI(): void {
     // 게임 UI 페이드인
     this.tweens.add({
-      targets: [this.questionContainer, this.padContainer, this.progressText, this.timerText],
+      targets: [this.questionContainer, this.padContainer, this.topBar.getContainer()],
       alpha: 1,
       duration: 200,
     });
+    this.topBar.setAlpha(1);
   }
 
   private createBackground(width: number, height: number): void {
@@ -109,24 +110,12 @@ export class GameScene extends Phaser.Scene {
     bg.fillRect(0, 0, width, height);
   }
 
-  private createHUD(width: number): void {
-    // 진행률 (좌상단)
-    this.progressText = this.add
-      .text(16, 16, '1/20', {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-      })
-      .setOrigin(0, 0);
-
-    // 타이머 (우상단, 작게)
-    this.timerText = this.add
-      .text(width - 16, 16, '0.00초', {
-        fontSize: '16px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(1, 0);
+  private createHUD(): void {
+    // 공통 상단 바 생성
+    this.topBar = new TopBar(this, {
+      left: { type: 'progress', initialValue: '1/20' },
+      right: { type: 'text', initialValue: '0.00초', color: BASE_COLORS.TEXT_SECONDARY },
+    });
   }
 
   private createQuestionArea(width: number, height: number): void {
@@ -331,7 +320,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // 진행률 업데이트
-    this.progressText.setText(`${this.currentQuestionIndex + 1}/${this.TOTAL_QUESTIONS}`);
+    this.topBar.updateValue('left', `${this.currentQuestionIndex + 1}/${this.TOTAL_QUESTIONS}`);
   }
 
   private checkAnswer(): void {
@@ -482,14 +471,14 @@ export class GameScene extends Phaser.Scene {
     if (this.isPlaying) {
       const elapsed = Date.now() - this.startTime;
       const seconds = (elapsed / 1000).toFixed(2);
-      this.timerText.setText(`${seconds}초`);
+      this.topBar.updateValue('right', `${seconds}초`);
     }
   }
 
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width } = gameSize;
 
-    // HUD 위치 조정
-    this.timerText?.setPosition(width - 16, 16);
+    // 상단 바 리사이즈 대응
+    this.topBar?.handleResize(width);
   }
 }
