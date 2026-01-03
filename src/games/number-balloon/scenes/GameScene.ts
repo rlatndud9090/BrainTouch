@@ -286,15 +286,13 @@ export class GameScene extends Phaser.Scene {
     this.drawBalloon(graphics, data);
     graphics.setPosition(data.x, data.y + this.gameAreaTop);
 
-    // 숫자 텍스트 (Cherry Bomb One 폰트)
-    const fontSize = Math.max(data.size * 0.65, 22);
+    // 숫자 텍스트 (Cherry Bomb One 폰트, 풍선 크기에 맞게)
+    const fontSize = Math.max(data.size * 0.85, 28);
     const text = this.add
       .text(data.x, data.y + this.gameAreaTop, String(data.value), {
         fontSize: `${fontSize}px`,
         fontFamily: FONTS.NUMBER,
         color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 2,
       })
       .setOrigin(0.5);
 

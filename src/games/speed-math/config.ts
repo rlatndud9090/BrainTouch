@@ -25,6 +25,9 @@ export function getGameConfig(
     scene: [GameScene, GameSceneHW, ResultScene],
     input: {
       activePointers: 3,
+      touch: {
+        capture: true,
+      },
     },
     render: {
       antialias: true,
