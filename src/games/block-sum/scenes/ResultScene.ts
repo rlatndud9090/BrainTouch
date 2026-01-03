@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
 import { createGradientBackground, createButton } from '../../../shared/ui';
+import { FONTS } from '../../../shared/constants';
 
 // 게임 색상
 const COLORS = {
@@ -57,9 +58,8 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(width / 2, height * 0.35, `${this.score}`, {
         fontSize: '72px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: COLORS.ACCENT_TEXT,
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 

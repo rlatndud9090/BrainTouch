@@ -11,7 +11,8 @@ import {
 } from '../utils/BlockGenerator';
 import { BASE_COLORS, THEME_PRESETS, COLORFUL_PALETTE } from '../../../shared/colors';
 import { createGradientBackground, showStartScreen } from '../../../shared/ui';
-import { TopBar, TOP_BAR } from '../../../shared/topBar';
+import { TopBar } from '../../../shared/topBar';
+import { FONTS } from '../../../shared/constants';
 
 // 게임 색상
 const COLORS = {
@@ -24,6 +25,33 @@ const COLORS = {
 
 // 블록 색상 팔레트 (공통 팔레트 사용)
 const BLOCK_COLORS = COLORFUL_PALETTE;
+
+// ========================================
+// 🎮 라운드 제한시간 설정 (초 단위)
+// 형님이 테스트 후 조정하기 쉽게 분리
+// ========================================
+const ROUND_TIME_CONFIG = {
+  // 초반 (1~4 라운드): 여유롭게
+  EARLY: 10,
+  // 중반 (5~9 라운드): 보통
+  MID: 8,
+  // 후반 (10+ 라운드): 빠르게
+  LATE: 6,
+  // 라운드 구간 기준
+  EARLY_THRESHOLD: 5,
+  MID_THRESHOLD: 10,
+} as const;
+
+// 라운드에 따른 제한시간 반환
+function getRoundTimeLimit(round: number): number {
+  if (round < ROUND_TIME_CONFIG.EARLY_THRESHOLD) {
+    return ROUND_TIME_CONFIG.EARLY;
+  } else if (round < ROUND_TIME_CONFIG.MID_THRESHOLD) {
+    return ROUND_TIME_CONFIG.MID;
+  } else {
+    return ROUND_TIME_CONFIG.LATE;
+  }
+}
 
 // 블록 스프라이트 정보
 interface BlockSprite {
@@ -38,8 +66,12 @@ export class GameScene extends Phaser.Scene {
   private clearedRounds = 0;
   private difficulty: Difficulty = 'easy';
   private consecutiveSuccess = 0; // 연속 성공 횟수
-  private timeLeft = 60000; // 60초
   private isPlaying = false;
+
+  // 라운드 타이머
+  private roundTimeLimit = 0; // 현재 라운드 제한시간 (초)
+  private roundTimeLeft = 0; // 남은 시간 (ms)
+  private roundTimerEvent?: Phaser.Time.TimerEvent;
 
   // 현재 라운드
   private currentRound!: RoundData;
@@ -47,7 +79,7 @@ export class GameScene extends Phaser.Scene {
 
   // UI 요소
   private topBar!: TopBar;
-  private difficultyText!: Phaser.GameObjects.Text;
+  private targetLabel!: Phaser.GameObjects.Text;
   private targetText!: Phaser.GameObjects.Text;
   private blockContainer!: Phaser.GameObjects.Container;
 
@@ -76,9 +108,10 @@ export class GameScene extends Phaser.Scene {
     this.clearedRounds = 0;
     this.difficulty = 'easy';
     this.consecutiveSuccess = 0;
-    this.timeLeft = 60000;
     this.isPlaying = false;
     this.blockSprites = [];
+    this.roundTimeLimit = 0;
+    this.roundTimeLeft = 0;
 
     // 레이아웃 계산
     this.calculateLayout(width, height);
@@ -87,7 +120,7 @@ export class GameScene extends Phaser.Scene {
     createGradientBackground(this, width, height);
 
     // HUD
-    this.createHUD(width);
+    this.createHUD();
 
     // 목표 영역
     this.createTargetArea(width, height);
@@ -98,6 +131,7 @@ export class GameScene extends Phaser.Scene {
     // 첫 라운드 준비 (카운트다운 동안 숨김)
     this.prepareRound();
     this.blockContainer.setAlpha(0);
+    this.targetLabel.setAlpha(0);
     this.targetText.setAlpha(0);
 
     // 전역 스와이프 감지 (블록 영역 밖에서 pointerup 되어도 감지)
@@ -171,29 +205,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private createHUD(width: number): void {
-    // 공통 상단 바 생성
+  private createHUD(): void {
+    // 공통 상단 바 생성: 하트 | 라운드 시간 | 점수
     this.topBar = new TopBar(this, {
-      left: { type: 'time', initialValue: 60, color: COLORS.ACCENT_TEXT },
+      left: { type: 'lives', maxLives: 3 },
+      center: { type: 'time', initialValue: 10, color: COLORS.ACCENT_TEXT },
       right: { type: 'score', initialValue: 0 },
     });
-
-    // 난이도 (우상단 아래, TopBar 바깥)
-    this.difficultyText = this.add
-      .text(width - TOP_BAR.PADDING_X, TOP_BAR.HEIGHT + 5, '난이도: 하', {
-        fontSize: '14px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(1, 0)
-      .setDepth(100);
   }
 
   private createTargetArea(width: number, height: number): void {
     const targetY = height * 0.15;
 
     // "목표" 라벨
-    this.add
+    this.targetLabel = this.add
       .text(width / 2, targetY - 25, '목표', {
         fontSize: '18px',
         fontFamily: 'Pretendard, sans-serif',
@@ -205,14 +230,16 @@ export class GameScene extends Phaser.Scene {
     this.targetText = this.add
       .text(width / 2, targetY + 15, '0', {
         fontSize: '56px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: COLORS.ACCENT_TEXT,
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
   }
 
   private prepareRound(): void {
+    // 기존 타이머 정리
+    this.roundTimerEvent?.destroy();
+
     // 기존 블록 제거
     this.blockSprites.forEach((bs) => bs.container.destroy());
     this.blockSprites = [];
@@ -225,6 +252,15 @@ export class GameScene extends Phaser.Scene {
 
     // 블록 생성
     this.createBlocks();
+
+    // 라운드 타이머 설정
+    this.roundTimeLimit = getRoundTimeLimit(this.clearedRounds + 1);
+    this.roundTimeLeft = this.roundTimeLimit * 1000;
+    this.topBar.updateValue('center', this.roundTimeLimit);
+    this.topBar.setColor('center', COLORS.ACCENT_TEXT); // 색상 리셋
+
+    // 라운드 타이머 시작
+    this.startRoundTimer();
   }
 
   private createBlocks(): void {
@@ -268,13 +304,12 @@ export class GameScene extends Phaser.Scene {
       .rectangle(0, 0, this.blockWidth, this.blockHeight, 0x000000, 0)
       .setInteractive({ useHandCursor: true, draggable: false });
 
-    // 숫자 (폰트 사이즈 증가)
+    // 숫자 (Cherry Bomb One 폰트)
     const text = this.add
       .text(0, 0, String(data.value), {
         fontSize: '44px',
-        fontFamily: 'Pretendard, sans-serif',
+        fontFamily: FONTS.NUMBER,
         color: '#ffffff',
-        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
@@ -362,6 +397,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleRoundSuccess(remainingBlockCount: number): void {
+    // 타이머 정지
+    this.roundTimerEvent?.destroy();
+
     this.clearedRounds++;
     this.consecutiveSuccess++;
 
@@ -374,19 +412,14 @@ export class GameScene extends Phaser.Scene {
     this.score += roundScore;
     this.topBar.updateValue('right', this.score);
 
-    // 성공 효과
-    this.showSuccessFeedback(roundScore);
-
     // 난이도 상승 체크
     if (this.consecutiveSuccess >= 3 && this.difficulty !== 'hard') {
       this.difficulty = getNextDifficulty(this.difficulty);
       this.consecutiveSuccess = 0;
-      this.difficultyText.setText(`난이도: ${getDifficultyName(this.difficulty)}`);
-      this.showDifficultyUpFeedback();
     }
 
-    // 다음 라운드
-    this.time.delayedCall(500, () => {
+    // 성공 효과 후 다음 라운드
+    this.showSuccessFeedback(() => {
       if (this.isPlaying) {
         this.prepareRound();
       }
@@ -394,46 +427,88 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleRoundFail(): void {
+    // 타이머 정지
+    this.roundTimerEvent?.destroy();
+
     this.consecutiveSuccess = 0;
+
+    // 하트 감소
+    const isGameOver = this.topBar.loseLife('left');
 
     // 실패 효과
     this.showFailFeedback();
 
-    // 다음 라운드
-    this.time.delayedCall(800, () => {
+    // 게임 오버 체크
+    if (isGameOver) {
+      this.time.delayedCall(500, () => {
+        this.endGame();
+      });
+      return;
+    }
+
+    // 다음 라운드 (실패 효과 후 빠르게 전환)
+    this.time.delayedCall(500, () => {
       if (this.isPlaying) {
         this.prepareRound();
       }
     });
   }
 
-  private showSuccessFeedback(points: number): void {
-    const { width, height } = this.scale;
+  private showSuccessFeedback(onComplete?: () => void): void {
+    // 목표 숫자에 겹쳐서 O 마크 표시 (채점 느낌)
+    const targetX = this.targetText.x;
+    const targetY = this.targetText.y;
 
-    const text = this.add
-      .text(width / 2, height * 0.4, `+${points}`, {
-        fontSize: '48px',
+    const mark = this.add
+      .text(targetX, targetY, '○', {
+        fontSize: '80px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#4ecca3',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
+      .setDepth(200) // 숫자 위에 겹치도록
+      .setAlpha(1);
+
+    // O 깜빡깜빡 2번 (duration 150ms로 약간 느리게)
+    this.tweens.add({
+      targets: mark,
+      alpha: 0,
+      duration: 150,
+      yoyo: true,
+      repeat: 1, // 1→0→1→0 = 깜빡 2번
+      onComplete: () => {
+        mark.destroy();
+        // 점멸 끝나고 다음 라운드로
+        onComplete?.();
+      },
+    });
+
+    // 따봉 효과: 왼쪽에서 슬라이드 인 + 페이드 인
+    const thumbX = this.targetText.x + this.targetText.width / 2 + 40;
+    const thumbY = this.targetText.y;
+
+    const thumb = this.add
+      .text(thumbX - 30, thumbY, '👍', {
+        fontSize: '36px',
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(200)
       .setAlpha(0);
 
     this.tweens.add({
-      targets: text,
-      y: height * 0.35,
+      targets: thumb,
+      x: thumbX,
       alpha: 1,
-      duration: 300,
-      ease: 'Back.easeOut',
+      duration: 250,
+      ease: 'Power2',
       onComplete: () => {
         this.tweens.add({
-          targets: text,
+          targets: thumb,
           alpha: 0,
-          y: height * 0.3,
-          duration: 200,
-          delay: 200,
-          onComplete: () => text.destroy(),
+          duration: 100,
+          delay: 100,
+          onComplete: () => thumb.destroy(),
         });
       },
     });
@@ -442,80 +517,84 @@ export class GameScene extends Phaser.Scene {
   private showFailFeedback(): void {
     const { width, height } = this.scale;
 
-    const text = this.add
-      .text(width / 2, height * 0.4, '❌ 불가능!', {
-        fontSize: '36px',
+    // 목표 숫자에 겹쳐서 X 마크 표시 (채점 느낌)
+    const targetX = this.targetText.x;
+    const targetY = this.targetText.y;
+
+    const mark = this.add
+      .text(targetX, targetY, '✕', {
+        fontSize: '80px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#e94560',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setAlpha(0);
+      .setDepth(200) // 숫자 위에 겹치도록
+      .setAlpha(1);
 
+    // X 표시 후 페이드 아웃
     this.tweens.add({
-      targets: text,
-      alpha: 1,
+      targets: mark,
+      alpha: 0,
       duration: 200,
-      yoyo: true,
-      hold: 400,
-      onComplete: () => text.destroy(),
+      delay: 500,
+      onComplete: () => mark.destroy(),
     });
-  }
 
-  private showDifficultyUpFeedback(): void {
-    const { width, height } = this.scale;
+    // 화면 흔들림
+    this.cameras.main.shake(200, 0.01);
 
-    const text = this.add
-      .text(width / 2, height * 0.3, `🔥 난이도 UP!`, {
-        fontSize: '32px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.ACCENT_TEXT,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
+    // 빨간색 플래시 오버레이
+    const flashOverlay = this.add
+      .rectangle(width / 2, height / 2, width, height, 0xe94560, 0.3)
+      .setDepth(1000);
 
     this.tweens.add({
-      targets: text,
-      alpha: 1,
-      scale: 1.2,
+      targets: flashOverlay,
+      alpha: 0,
       duration: 300,
-      yoyo: true,
-      hold: 500,
-      onComplete: () => text.destroy(),
+      onComplete: () => flashOverlay.destroy(),
     });
   }
 
   private startGame(): void {
     this.isPlaying = true;
     this.blockContainer.setAlpha(1);
+    this.targetLabel.setAlpha(1);
     this.targetText.setAlpha(1);
 
-    // 타이머 시작
-    this.time.addEvent({
+    // 첫 라운드 타이머 시작
+    this.startRoundTimer();
+  }
+
+  private startRoundTimer(): void {
+    if (!this.isPlaying) return;
+
+    this.roundTimerEvent = this.time.addEvent({
       delay: 100,
-      callback: this.updateTimer,
+      callback: this.updateRoundTimer,
       callbackScope: this,
       loop: true,
     });
   }
 
-  private updateTimer(): void {
+  private updateRoundTimer(): void {
     if (!this.isPlaying) return;
 
-    this.timeLeft -= 100;
+    this.roundTimeLeft -= 100;
 
-    const seconds = Math.max(0, this.timeLeft / 1000);
-    this.topBar.updateValue('left', parseFloat(seconds.toFixed(1)));
+    const seconds = Math.max(0, this.roundTimeLeft / 1000);
+    this.topBar.updateValue('center', parseFloat(seconds.toFixed(1)));
 
-    // 10초 이하일 때 빨간색
-    if (this.timeLeft <= 10000) {
-      this.topBar.setColor('left', '#e94560');
+    // 3초 이하일 때 빨간색
+    if (this.roundTimeLeft <= 3000) {
+      this.topBar.setColor('center', '#e94560');
     }
 
-    // 타임오버
-    if (this.timeLeft <= 0) {
-      this.endGame();
+    // 시간 초과 = 실패
+    if (this.roundTimeLeft <= 0) {
+      this.roundTimerEvent?.destroy();
+      this.handleRoundFail();
     }
   }
 
@@ -535,8 +614,5 @@ export class GameScene extends Phaser.Scene {
 
     // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);
-
-    // 난이도 텍스트 위치 조정
-    this.difficultyText?.setPosition(width - TOP_BAR.PADDING_X, TOP_BAR.HEIGHT + 5);
   }
 }
