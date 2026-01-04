@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { MainScene } from './scenes/MainScene';
 import { ResultScene } from './scenes/ResultScene';
-import { GAME_LAYOUT } from '../../shared/constants';
+import { createHighResScale } from '../../shared/constants';
 
 export function getGameConfig(
   parent: HTMLElement,
@@ -11,12 +11,7 @@ export function getGameConfig(
     type: Phaser.AUTO,
     parent,
     backgroundColor: '#1a1a2e',
-    scale: {
-      mode: Phaser.Scale.FIT,
-      width: Math.min(parent.clientWidth, GAME_LAYOUT.MAX_WIDTH),
-      height: parent.clientHeight,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
-    },
+    scale: createHighResScale(parent.clientWidth, parent.clientHeight),
     scene: [MainScene, ResultScene],
     physics: {
       default: 'arcade',

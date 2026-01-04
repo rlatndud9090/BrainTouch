@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
 import { GameSceneHW } from './scenes/GameSceneHW';
 import { ResultScene } from './scenes/ResultScene';
-import { GAME_LAYOUT } from '../../shared/constants';
+import { createHighResScale } from '../../shared/constants';
 
 export interface GameResult {
   totalTime: number; // 총 소요 시간 (ms)
@@ -16,12 +16,7 @@ export function getGameConfig(
     type: Phaser.AUTO,
     parent,
     backgroundColor: '#1a1a2e',
-    scale: {
-      mode: Phaser.Scale.FIT,
-      width: Math.min(parent.clientWidth, GAME_LAYOUT.MAX_WIDTH),
-      height: parent.clientHeight,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
-    },
+    scale: createHighResScale(parent.clientWidth, parent.clientHeight),
     scene: [GameScene, GameSceneHW, ResultScene],
     input: {
       activePointers: 3,
