@@ -67,6 +67,7 @@ export class GameScene extends Phaser.Scene {
   private difficulty: Difficulty = 'easy';
   private consecutiveSuccess = 0; // 연속 성공 횟수
   private isPlaying = false;
+  private isAnimating = false; // O/X 애니메이션 중에는 스와이프 차단
 
   // 라운드 타이머
   private roundTimeLimit = 0; // 현재 라운드 제한시간 (초)
@@ -156,7 +157,7 @@ export class GameScene extends Phaser.Scene {
   private setupGlobalSwipeDetection(): void {
     // pointermove에서 속도 기반 스와이프 감지
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (!this.selectedBlock || !this.isPlaying) return;
+      if (!this.selectedBlock || !this.isPlaying || this.isAnimating) return;
 
       const dx = pointer.x - this.swipeStartX;
       const dy = pointer.y - this.swipeStartY;
@@ -236,6 +237,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private prepareRound(): void {
+    // 애니메이션 상태 리셋
+    this.isAnimating = false;
+
     // 기존 타이머 정리
     this.roundTimerEvent?.destroy();
 
@@ -326,7 +330,7 @@ export class GameScene extends Phaser.Scene {
 
     // pointerdown에서 블록 선택 및 스와이프 시작점 기록
     hitArea.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (!this.isPlaying || blockSprite.isRemoving) return;
+      if (!this.isPlaying || this.isAnimating || blockSprite.isRemoving) return;
       this.selectedBlock = blockSprite;
       this.swipeStartX = pointer.x;
       this.swipeStartY = pointer.y;
@@ -396,8 +400,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleRoundSuccess(remainingBlockCount: number): void {
-    // 타이머 정지
+    // 타이머 정지 + 스와이프 차단
     this.roundTimerEvent?.destroy();
+    this.isAnimating = true;
 
     this.clearedRounds++;
     this.consecutiveSuccess++;
@@ -426,8 +431,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleRoundFail(): void {
-    // 타이머 정지
+    // 타이머 정지 + 스와이프 차단
     this.roundTimerEvent?.destroy();
+    this.isAnimating = true;
 
     this.consecutiveSuccess = 0;
 

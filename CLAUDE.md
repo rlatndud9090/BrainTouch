@@ -198,7 +198,7 @@ BrainTouch/
 
 - 게임 간 공통 모듈
 - `colors.ts`: 공통 색상 팔레트 + 게임별 테마 프리셋 (BASE_COLORS, THEME_PRESETS, COLORFUL_PALETTE)
-- `constants.ts`: 공통 상수 (GAME_LAYOUT 등)
+- `constants.ts`: 공통 상수 (GAME_LAYOUT, FONTS, createHighResScale 등)
 - `ui.ts`: 공통 UI 유틸리티 (버튼, 배경, 카운트다운, 시간 포맷, showStartScreen)
 - `lives.ts`: 목숨 관리 클래스 (LivesManager - 하트 표시, 목숨 증감, 게임오버 체크)
 - `topBar.ts`: 공통 상단 UI 바 (TopBar 클래스 - 점수/시간/하트/진행률/라운드 등 통일된 HUD 제공)
@@ -299,6 +299,8 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2026-01-04 | 블록셈 버그 수정: O/X 애니메이션 중 스와이프 차단       |
+| 2026-01-04 | 모바일 고해상도(DPR) 지원: 전체 게임 config에 적용      |
 | 2026-01-03 | Cherry Bomb One 폰트 적용 + 폰트 로딩 대기 로직 추가    |
 | 2026-01-03 | 숫자풍선 숫자 외곽선 제거 + 크기 조절 (풍선 비례)       |
 | 2026-01-03 | Block Sum, Number Balloon 라운드당 제한시간 시스템으로 변경 |
@@ -327,4 +329,4 @@ refactor/<game-name>-<description>
 
 ---
 
-_마지막 업데이트: 2026-01-03 (Cherry Bomb One 폰트 + 폰트 로딩 대기 + 숫자풍선 외곽선 제거)_
+_마지막 업데이트: 2026-01-04 (블록셈 버그 수정 + 모바일 고해상도 지원)_
