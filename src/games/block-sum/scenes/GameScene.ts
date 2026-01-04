@@ -128,8 +128,7 @@ export class GameScene extends Phaser.Scene {
     // 블록 컨테이너 (확인 버튼 제거로 세로 중앙 배치)
     this.blockContainer = this.add.container(width / 2, height * 0.5);
 
-    // 첫 라운드 준비 (카운트다운 동안 숨김)
-    this.prepareRound();
+    // 카운트다운 동안 숨김 (폰트 로딩 후 startGame에서 생성)
     this.blockContainer.setAlpha(0);
     this.targetLabel.setAlpha(0);
     this.targetText.setAlpha(0);
@@ -563,8 +562,8 @@ export class GameScene extends Phaser.Scene {
     this.targetLabel.setAlpha(1);
     this.targetText.setAlpha(1);
 
-    // 첫 라운드 타이머 시작
-    this.startRoundTimer();
+    // 첫 라운드 준비 (폰트 로딩 완료 후 블록 생성)
+    this.prepareRound();
   }
 
   private startRoundTimer(): void {

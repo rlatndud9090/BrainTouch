@@ -178,25 +178,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupInput(): void {
+    // pointerdown: 터치/클릭 시작
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying) return;
       this.isPointerDown = true;
       this.movePlayerToX(pointer.x);
     });
 
+    // pointermove: 드래그 중
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!this.isPlaying) return;
-      // pointer.primaryDown 대신 자체 플래그 사용 (브라우저 호환성 개선)
-      if (this.isPointerDown) {
+      // pointer.isDown 또는 자체 플래그 사용 (터치 호환성)
+      if (pointer.isDown || this.isPointerDown) {
         this.movePlayerToX(pointer.x);
       }
     });
 
+    // pointerup: 터치/클릭 종료
     this.input.on('pointerup', () => {
       this.isPointerDown = false;
     });
 
+    // pointerupoutside: 화면 밖에서 터치 종료
     this.input.on('pointerupoutside', () => {
+      this.isPointerDown = false;
+    });
+
+    // 추가: pointerout 처리 (터치가 캔버스 밖으로 나갔을 때)
+    this.input.on('pointerout', () => {
       this.isPointerDown = false;
     });
   }

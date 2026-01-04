@@ -4,7 +4,7 @@
 
 import Phaser from 'phaser';
 import { BASE_COLORS } from './colors';
-import { FONTS } from './constants';
+import { FONTS, waitForFonts } from './constants';
 
 /**
  * 그라데이션 배경 생성
@@ -245,10 +245,13 @@ export function showStartScreen(
     repeat: -1,
   });
 
-  // 터치하여 시작
-  scene.input.once('pointerdown', () => {
+  // 터치하여 시작 (폰트 로딩 완료 후 카운트다운)
+  scene.input.once('pointerdown', async () => {
     // 모든 요소 제거
     elements.forEach((el) => el.destroy());
+
+    // 폰트 로딩 대기 (이미 로딩됐으면 즉시 통과)
+    await waitForFonts();
 
     // 카운트다운 후 게임 시작
     playCountdown(scene, onStart);
