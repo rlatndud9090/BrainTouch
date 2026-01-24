@@ -4,7 +4,7 @@
 
 import Phaser from 'phaser';
 import { BASE_COLORS } from './colors';
-import { FONTS, waitForFonts } from './constants';
+import { FONTS } from './constants';
 
 /**
  * 그라데이션 배경 생성
@@ -35,7 +35,7 @@ export function createSolidBackground(
 }
 
 /**
- * 공통 버튼 생성
+ * 공통 버튼 생성 (둥근 모서리 지원)
  */
 export function createButton(
   scene: Phaser.Scene,
@@ -50,6 +50,7 @@ export function createButton(
     width?: number;
     height?: number;
     fontSize?: string;
+    borderRadius?: number; // 둥근 모서리 (기본값 25)
   } = {}
 ): Phaser.GameObjects.Container {
   const {
@@ -59,15 +60,20 @@ export function createButton(
     width = 200,
     height = 50,
     fontSize = '20px',
+    borderRadius = 25, // 기본적으로 둥글게
   } = options;
 
   const container = scene.add.container(x, y);
 
-  // 버튼 배경
-  const bg = scene.add
-    .rectangle(0, 0, width, height, bgColor, 1)
-    .setStrokeStyle(2, BASE_COLORS.STROKE);
-  bg.setInteractive({ useHandCursor: true });
+  // 둥근 모서리 버튼 배경 (Graphics 사용)
+  const bg = scene.add.graphics();
+  bg.fillStyle(bgColor, 1);
+  bg.fillRoundedRect(-width / 2, -height / 2, width, height, borderRadius);
+
+  // 인터랙션용 히트 영역 (투명 사각형)
+  const hitArea = scene.add
+    .rectangle(0, 0, width, height, 0x000000, 0)
+    .setInteractive({ useHandCursor: true });
 
   // 버튼 텍스트
   const text = scene.add
@@ -79,19 +85,26 @@ export function createButton(
     })
     .setOrigin(0.5);
 
-  container.add([bg, text]);
+  container.add([bg, hitArea, text]);
+
+  // 배경 다시 그리기 함수
+  const redrawBg = (color: number) => {
+    bg.clear();
+    bg.fillStyle(color, 1);
+    bg.fillRoundedRect(-width / 2, -height / 2, width, height, borderRadius);
+  };
 
   // 호버 효과
-  bg.on('pointerover', () => {
-    bg.setFillStyle(hoverColor);
+  hitArea.on('pointerover', () => {
+    redrawBg(hoverColor);
   });
 
-  bg.on('pointerout', () => {
-    bg.setFillStyle(bgColor);
+  hitArea.on('pointerout', () => {
+    redrawBg(bgColor);
   });
 
   // 클릭 효과
-  bg.on('pointerdown', () => {
+  hitArea.on('pointerdown', () => {
     scene.tweens.add({
       targets: container,
       scaleX: 0.95,
@@ -245,13 +258,10 @@ export function showStartScreen(
     repeat: -1,
   });
 
-  // 터치하여 시작 (폰트 로딩 완료 후 카운트다운)
-  scene.input.once('pointerdown', async () => {
+  // 터치하여 시작 (폰트는 이미 React 레벨에서 로딩 완료됨)
+  scene.input.once('pointerdown', () => {
     // 모든 요소 제거
     elements.forEach((el) => el.destroy());
-
-    // 폰트 로딩 대기 (이미 로딩됐으면 즉시 통과)
-    await waitForFonts();
 
     // 카운트다운 후 게임 시작
     playCountdown(scene, onStart);

@@ -212,6 +212,9 @@ export class GameScene extends Phaser.Scene {
       center: { type: 'time', initialValue: 10, color: COLORS.ACCENT_TEXT },
       right: { type: 'score', initialValue: 0 },
     });
+
+    // 대기 화면 동안 숨김 (폰트 로딩 전 깨짐 방지)
+    this.topBar.setAlpha(0);
   }
 
   private createTargetArea(width: number, height: number): void {
@@ -564,6 +567,9 @@ export class GameScene extends Phaser.Scene {
 
   private startGame(): void {
     this.isPlaying = true;
+
+    // TopBar 및 게임 UI 표시
+    this.topBar.setAlpha(1);
     this.blockContainer.setAlpha(1);
     this.targetLabel.setAlpha(1);
     this.targetText.setAlpha(1);

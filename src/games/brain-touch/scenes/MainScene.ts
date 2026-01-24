@@ -58,6 +58,9 @@ export class MainScene extends Phaser.Scene {
       center: { type: 'lives', maxLives: 3 },
       right: { type: 'time', initialValue: this.timeLeft, color: '#4ecca3' },
     });
+
+    // 대기 화면 동안 숨김 (폰트 로딩 전 깨짐 방지)
+    this.topBar.setAlpha(0);
   }
 
   private showStartScreen(): void {
@@ -73,6 +76,8 @@ export class MainScene extends Phaser.Scene {
     this.score = 0;
     this.timeLeft = 30;
 
+    // TopBar 표시
+    this.topBar.setAlpha(1);
     this.topBar.updateValue('left', 0);
     this.topBar.resetLives('center');
 

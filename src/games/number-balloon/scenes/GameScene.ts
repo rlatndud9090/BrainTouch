@@ -225,6 +225,9 @@ export class GameScene extends Phaser.Scene {
       center: { type: 'time', initialValue: 10, color: COLORS.TEXT_DARK },
       right: { type: 'score', initialValue: 0, color: COLORS.TEXT_DARK },
     });
+
+    // 대기 화면 동안 숨김 (폰트 로딩 전 깨짐 방지)
+    this.topBar.setAlpha(0);
   }
 
   private prepareRound(): void {
@@ -468,7 +471,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-
   private handleRoundClear(): void {
     // 타이머 정지
     this.roundTimerEvent?.destroy();
@@ -502,7 +504,11 @@ export class GameScene extends Phaser.Scene {
 
   private startGame(): void {
     this.isPlaying = true;
+
+    // TopBar 및 안내 텍스트 표시
+    this.topBar.setAlpha(1);
     this.instructionText.setAlpha(1);
+
     this.prepareRound();
   }
 

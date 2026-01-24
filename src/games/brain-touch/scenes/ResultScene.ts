@@ -102,15 +102,15 @@ export class ResultScene extends Phaser.Scene {
         this,
         width / 2,
         height * 0.78,
-        '🔄 다시하기',
+        '다시 도전',
         () => {
           this.scene.start('MainScene');
         },
         {
           bgColor: THEME.accent,
           hoverColor: THEME.accentHover,
-          width: 180,
-          height: 50,
+          width: 200,
+          height: 54,
         }
       );
 
@@ -119,7 +119,7 @@ export class ResultScene extends Phaser.Scene {
         this,
         width / 2,
         height * 0.88,
-        '🏠 홈으로',
+        '홈으로',
         () => {
           // React에 게임 종료 이벤트 전달 → 홈으로 이동
           this.game.events.emit('gameOver', this.resultData.score);
@@ -127,8 +127,8 @@ export class ResultScene extends Phaser.Scene {
         {
           bgColor: BASE_COLORS.BUTTON_SECONDARY,
           hoverColor: BASE_COLORS.BUTTON_HOVER,
-          width: 180,
-          height: 50,
+          width: 200,
+          height: 54,
         }
       );
     });

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
+import { waitForFonts } from '../shared/constants';
 
 interface PhaserGameProps {
   gameId: string;
@@ -13,9 +14,12 @@ export default function PhaserGame({ gameId, onGameOver }: PhaserGameProps) {
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
 
-    // 동적으로 게임 설정 가져오기
+    // 폰트 로딩 완료 후 게임 시작
     const loadGame = async () => {
       try {
+        // 폰트 로딩 대기 (Cherry Bomb One 등)
+        await waitForFonts();
+
         // 게임별 설정 동적 import
         const gameModule = await import(`../games/${gameId}/config.ts`);
         const config = gameModule.getGameConfig(containerRef.current!, onGameOver);

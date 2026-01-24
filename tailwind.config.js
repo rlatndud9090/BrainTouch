@@ -22,6 +22,7 @@ export default {
       },
       fontFamily: {
         sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+        game: ['"Cherry Bomb One"', 'cursive'], // 게임용 숫자 폰트
       },
     },
   },

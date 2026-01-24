@@ -154,6 +154,9 @@ export class GameScene extends Phaser.Scene {
       backgroundColor: 0x000000,
       backgroundAlpha: 0.3, // 반투명 배경으로 별과 겹쳐도 가독성 유지
     });
+
+    // 대기 화면 동안 숨김 (폰트 로딩 전 깨짐 방지)
+    this.topBar.setAlpha(0);
   }
 
   private createPlayer(): void {
@@ -220,6 +223,10 @@ export class GameScene extends Phaser.Scene {
   private startGame(): void {
     this.isPlaying = true;
     this.startTime = Date.now();
+
+    // TopBar 표시
+    this.topBar.setAlpha(1);
+
     this.spawnMeteorWave();
   }
 

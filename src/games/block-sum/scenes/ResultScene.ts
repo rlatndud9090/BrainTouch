@@ -39,42 +39,36 @@ export class ResultScene extends Phaser.Scene {
 
     // 타이틀
     this.add
-      .text(width / 2, height * 0.12, '⏰ 시간 종료!', {
+      .text(width / 2, height * 0.18, '⏰ 시간 종료!', {
         fontSize: '40px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_PRIMARY,
       })
       .setOrigin(0.5);
 
-    // 점수 (메인)
+    // 점수 라벨
     this.add
-      .text(width / 2, height * 0.25, '점수', {
-        fontSize: '20px',
+      .text(width / 2, height * 0.35, '점수', {
+        fontSize: '24px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
       })
       .setOrigin(0.5);
 
+    // 점수 (메인)
     this.add
-      .text(width / 2, height * 0.35, `${this.score}`, {
+      .text(width / 2, height * 0.48, `${this.score}`, {
         fontSize: '72px',
         fontFamily: FONTS.NUMBER,
         color: COLORS.ACCENT_TEXT,
       })
       .setOrigin(0.5);
 
-    // 상세 정보
-    const infoY = height * 0.5;
-    const infoGap = 40;
-
-    this.createInfoRow(width / 2, infoY, '클리어 라운드', `${this.clearedRounds}`);
-    this.createInfoRow(width / 2, infoY + infoGap, '최고 난이도', this.maxDifficulty);
-
     // 버튼들
     createButton(
       this,
       width / 2,
-      height * 0.72,
+      height * 0.7,
       '다시 도전',
       () => {
         this.scene.start('GameScene');
@@ -83,13 +77,15 @@ export class ResultScene extends Phaser.Scene {
         bgColor: COLORS.ACCENT,
         hoverColor: THEME_PRESETS.blockSum.accentHover,
         textColor: '#1a1a2e',
+        width: 200,
+        height: 54,
       }
     );
 
     createButton(
       this,
       width / 2,
-      height * 0.84,
+      height * 0.82,
       '홈으로',
       () => {
         this.game.events.emit('gameOver', {
@@ -101,33 +97,9 @@ export class ResultScene extends Phaser.Scene {
       {
         bgColor: COLORS.BUTTON_SECONDARY,
         hoverColor: COLORS.BUTTON_HOVER,
+        width: 200,
+        height: 54,
       }
     );
-
-    // 리사이즈 대응
-    this.scale.on('resize', this.handleResize, this);
-  }
-
-  private createInfoRow(x: number, y: number, label: string, value: string): void {
-    this.add
-      .text(x - 80, y, label, {
-        fontSize: '18px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(0, 0.5);
-
-    this.add
-      .text(x + 80, y, value, {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(1, 0.5);
-  }
-
-  private handleResize(_gameSize: Phaser.Structs.Size): void {
-    // 필요 시 리사이즈 로직 추가
   }
 }

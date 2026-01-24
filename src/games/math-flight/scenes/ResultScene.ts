@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
+import { BASE_COLORS } from '../../../shared/colors';
+import { createButton } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
 
 // 색상 상수
 const COLORS = {
   BG_SPACE: 0x0a0a1a,
-  ACCENT_CYAN: 0x00d4ff,
+  ACCENT_CYAN: '#00d4ff',
   TEXT_PRIMARY: '#ffffff',
   TEXT_SECONDARY: '#a0a0a0',
   BUTTON_PRIMARY: 0x00d4ff,
@@ -49,49 +51,51 @@ export class ResultScene extends Phaser.Scene {
 
     // 타이틀
     this.add
-      .text(width / 2, height * 0.12, '🚀 비행 종료!', {
+      .text(width / 2, height * 0.18, '🚀 비행 종료!', {
         fontSize: '40px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_PRIMARY,
       })
       .setOrigin(0.5);
 
-    // 점수 (메인)
+    // 점수 라벨
     this.add
-      .text(width / 2, height * 0.25, '점수', {
-        fontSize: '20px',
+      .text(width / 2, height * 0.35, '점수', {
+        fontSize: '24px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
       })
       .setOrigin(0.5);
 
+    // 점수 (메인)
     this.add
-      .text(width / 2, height * 0.33, `${this.totalScore}`, {
-        fontSize: '64px',
+      .text(width / 2, height * 0.48, `${this.totalScore}`, {
+        fontSize: '72px',
         fontFamily: FONTS.NUMBER,
-        color: '#00d4ff',
+        color: COLORS.ACCENT_CYAN,
       })
       .setOrigin(0.5);
 
-    // 상세 정보
-    const infoY = height * 0.48;
-    const infoGap = 40;
-
-    this.createInfoRow(width / 2, infoY, '생존 시간', this.formatTime(this.survivalTime));
-    this.createInfoRow(width / 2, infoY + infoGap, '클리어 턴', `${this.turnCount}`);
-
     // 버튼들
-    this.createButton(
+    createButton(
+      this,
       width / 2,
       height * 0.7,
       '다시 도전',
       () => {
         this.scene.start('GameScene');
       },
-      COLORS.BUTTON_PRIMARY
+      {
+        bgColor: COLORS.BUTTON_PRIMARY,
+        hoverColor: 0x33e0ff,
+        textColor: '#0a0a1a',
+        width: 200,
+        height: 54,
+      }
     );
 
-    this.createButton(
+    createButton(
+      this,
       width / 2,
       height * 0.82,
       '홈으로',
@@ -102,86 +106,12 @@ export class ResultScene extends Phaser.Scene {
           turnCount: this.turnCount,
         });
       },
-      COLORS.BUTTON_SECONDARY
+      {
+        bgColor: COLORS.BUTTON_SECONDARY,
+        hoverColor: BASE_COLORS.BUTTON_HOVER,
+        width: 200,
+        height: 54,
+      }
     );
-  }
-
-  private formatTime(ms: number): string {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-
-    if (minutes > 0) {
-      return `${minutes}분 ${remainingSeconds}초`;
-    }
-    return `${seconds}초`;
-  }
-
-  private createInfoRow(x: number, y: number, label: string, value: string): void {
-    this.add
-      .text(x - 80, y, label, {
-        fontSize: '18px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_SECONDARY,
-      })
-      .setOrigin(0, 0.5);
-
-    this.add
-      .text(x + 80, y, value, {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(1, 0.5);
-  }
-
-  private createButton(
-    x: number,
-    y: number,
-    label: string,
-    onClick: () => void,
-    bgColor: number
-  ): Phaser.GameObjects.Container {
-    const container = this.add.container(x, y);
-    const buttonWidth = 200;
-    const buttonHeight = 50;
-
-    const bg = this.add
-      .rectangle(0, 0, buttonWidth, buttonHeight, bgColor, 1)
-      .setStrokeStyle(2, 0x5a5a7e);
-    bg.setInteractive({ useHandCursor: true });
-
-    const text = this.add
-      .text(0, 0, label, {
-        fontSize: '20px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: bgColor === COLORS.BUTTON_PRIMARY ? '#0a0a1a' : COLORS.TEXT_PRIMARY,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    container.add([bg, text]);
-
-    bg.on('pointerover', () => {
-      bg.setFillStyle(bgColor === COLORS.BUTTON_PRIMARY ? 0x33e0ff : 0x4a4a6e);
-    });
-
-    bg.on('pointerout', () => {
-      bg.setFillStyle(bgColor);
-    });
-
-    bg.on('pointerdown', () => {
-      this.tweens.add({
-        targets: container,
-        scaleX: 0.95,
-        scaleY: 0.95,
-        duration: 50,
-        yoyo: true,
-        onComplete: onClick,
-      });
-    });
-
-    return container;
   }
 }

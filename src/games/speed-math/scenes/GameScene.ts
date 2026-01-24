@@ -90,6 +90,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showGameUI(): void {
+    // TopBar 표시
+    this.topBar.setAlpha(1);
+
     // 게임 UI 페이드인
     this.tweens.add({
       targets: [this.questionContainer, this.padContainer],
@@ -115,6 +118,9 @@ export class GameScene extends Phaser.Scene {
       left: { type: 'progress', initialValue: '1/20' },
       right: { type: 'text', initialValue: '0.00초', color: BASE_COLORS.TEXT_SECONDARY },
     });
+
+    // 대기 화면 동안 숨김 (폰트 로딩 전 깨짐 방지)
+    this.topBar.setAlpha(0);
   }
 
   private createQuestionArea(width: number, height: number): void {

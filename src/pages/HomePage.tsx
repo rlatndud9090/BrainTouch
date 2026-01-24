@@ -40,11 +40,18 @@ export default function HomePage() {
     <div className="w-full h-full flex flex-col bg-toss-black">
       {/* 헤더 */}
       <header className="flex items-center justify-between px-5 py-4 border-b border-toss-gray-600">
-        <h1 className="text-xl font-bold">🧮 브레인 터치 - 계산편</h1>
+        <h1 className="text-xl font-bold">
+          <span className="font-game text-2xl">🧮</span> 브레인 터치 - 계산편
+        </h1>
         <Link to="/ranking" className="text-toss-blue text-sm font-medium">
           랭킹
         </Link>
       </header>
+
+      {/* 폰트 프리로드용 숨겨진 텍스트 (Cherry Bomb One) */}
+      <span className="font-game absolute opacity-0 pointer-events-none" aria-hidden="true">
+        0123456789
+      </span>
 
       {/* 게임 목록 */}
       <main className="flex-1 overflow-y-auto p-5">
