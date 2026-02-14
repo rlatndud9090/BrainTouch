@@ -49,33 +49,21 @@ export class ModeSelectScene extends Phaser.Scene {
     // 숫자패드 모드 버튼 (현재 유일하게 활성화된 모드)
     this.createModeButton(
       width / 2,
-      height * 0.5, // 중앙 배치
+      height * 0.45,
       '🔢 숫자패드',
       '빠르고 정확한 입력',
       COLORS.BUTTON_KEYPAD,
       () => this.startGame('keypad')
     );
 
-    // TODO: 필기 인식률 개선 후 다시 활성화
-    // // 필기 모드 버튼
-    // this.createModeButton(
-    //   width / 2,
-    //   height * 0.62,
-    //   '✏️ 필기 입력',
-    //   '손글씨로 숫자 입력',
-    //   COLORS.BUTTON_HANDWRITING,
-    //   () => this.handleHandwritingSelect()
-    // );
-
-    // // 모델 로딩 상태 텍스트
-    // this.loadingText = this.add
-    //   .text(width / 2, height * 0.78, '', {
-    //     fontSize: '14px',
-    //     fontFamily: 'Pretendard, sans-serif',
-    //     color: COLORS.TEXT_SECONDARY,
-    //   })
-    //   .setOrigin(0.5)
-    //   .setAlpha(0);
+    // 필기 모드는 노출하되 비활성 상태로 안내
+    this.createDisabledModeButton(
+      width / 2,
+      height * 0.62,
+      '✏️ 필기 입력',
+      '인식률 개선 후 오픈 예정',
+      COLORS.BUTTON_HANDWRITING
+    );
 
     // 홈 버튼
     this.createHomeButton(width);
@@ -166,6 +154,56 @@ export class ModeSelectScene extends Phaser.Scene {
         onComplete: onClick,
       });
     });
+  }
+
+
+  private createDisabledModeButton(
+    x: number,
+    y: number,
+    title: string,
+    description: string,
+    color: number
+  ): void {
+    const { width } = this.scale;
+    const buttonWidth = Math.min(width * 0.8, 280);
+    const buttonHeight = 80;
+
+    const container = this.add.container(x, y);
+
+    const bg = this.add
+      .rectangle(0, 0, buttonWidth, buttonHeight, color, 0.35)
+      .setStrokeStyle(2, 0xffffff, 0.2);
+
+    const titleText = this.add
+      .text(0, -12, title, {
+        fontSize: '22px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.85);
+
+    const descText = this.add
+      .text(0, 14, description, {
+        fontSize: '14px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.8);
+
+    const badge = this.add
+      .text(buttonWidth / 2 - 14, -buttonHeight / 2 + 14, '준비중', {
+        fontSize: '11px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#1a1a2e',
+        backgroundColor: '#ffffff',
+        padding: { x: 6, y: 2 },
+      })
+      .setOrigin(1, 0.5);
+
+    container.add([bg, titleText, descText, badge]);
   }
 
   private createHomeButton(width: number): void {
