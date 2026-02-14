@@ -16,6 +16,8 @@
 
 ---
 
+> 구현 상태 (2026-02): **숫자패드 모드 단일 제공**
+
 ## 🎮 게임 규칙
 
 ### 기본 규칙
@@ -54,7 +56,7 @@
 
 ## 🎯 입력 방식
 
-### 모드 1: 필기 입력 (Handwriting)
+### 모드 1: 필기 입력 (Handwriting) *(내부 검토 중, 사용자 미노출)*
 
 ```
 ┌─────────────────────────────────┐
@@ -167,18 +169,13 @@
 speed-math/
 ├── config.ts                 # Phaser 게임 설정
 ├── scenes/
-│   ├── PreloadScene.ts       # 에셋/모델 로딩
-│   ├── MenuScene.ts          # 모드 선택 (필기/패드)
-│   ├── GameScene.ts          # 메인 게임 로직
+│   ├── ModeSelectScene.ts    # 모드 선택 (숫자패드 단일)
+│   ├── GameScene.ts          # 숫자패드 메인 게임
+│   ├── GameSceneHW.ts        # 필기 모드 씬(준비중)
 │   └── ResultScene.ts        # 결과 화면
-├── components/
-│   ├── HandwritingCanvas.ts  # 필기 입력 컴포넌트
-│   ├── NumberPad.ts          # 숫자패드 컴포넌트
-│   └── QuestionDisplay.ts    # 문제 표시 컴포넌트
 ├── utils/
 │   ├── QuestionGenerator.ts  # 문제 생성 로직
-│   ├── DigitRecognizer.ts    # TensorFlow.js 숫자 인식
-│   └── ScoreManager.ts       # 점수/기록 관리
+│   └── DigitRecognizer.ts    # TensorFlow.js 숫자 인식
 └── DESIGN.md                 # 이 문서
 ```
 
@@ -188,15 +185,10 @@ speed-math/
 [앱 시작]
     │
     ▼
-[PreloadScene] ─── 에셋 로딩
-    │              TensorFlow.js 모델 로딩
+[ModeSelectScene] ─ 입력 모드 선택
+    │                - 숫자패드
     ▼
-[MenuScene] ─────── 입력 모드 선택
-    │               - 필기 모드
-    │               - 숫자패드 (일반)
-    │               - 숫자패드 (어려움)
-    ▼
-[GameScene] ─────── 게임 플레이
+[GameScene] ─────── 숫자패드 게임 플레이
     │               - 20문제 출제
     │               - 타이머 측정
     │               - 정답/오답 처리
