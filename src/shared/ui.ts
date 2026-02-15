@@ -286,3 +286,55 @@ export function formatTime(ms: number, showDecimals = false): string {
 
   return `${seconds}초`;
 }
+
+/**
+ * 짧게 사라지는 토스트 메시지 표시
+ */
+export function showToast(
+  scene: Phaser.Scene,
+  message: string,
+  options: {
+    x?: number;
+    y?: number;
+    color?: string;
+    durationMs?: number;
+    fontSize?: string;
+  } = {}
+): void {
+  const { width, height } = scene.scale;
+  const {
+    x = width / 2,
+    y = height * 0.94,
+    color = '#4ecca3',
+    durationMs = 1200,
+    fontSize = '16px',
+  } = options;
+
+  const toast = scene.add
+    .text(x, y, message, {
+      fontSize,
+      fontFamily: 'Pretendard, sans-serif',
+      color,
+      fontStyle: 'bold',
+      align: 'center',
+    })
+    .setOrigin(0.5)
+    .setDepth(999)
+    .setAlpha(0);
+
+  scene.tweens.add({
+    targets: toast,
+    alpha: 1,
+    duration: 120,
+    onComplete: () => {
+      scene.time.delayedCall(durationMs, () => {
+        scene.tweens.add({
+          targets: toast,
+          alpha: 0,
+          duration: 180,
+          onComplete: () => toast.destroy(),
+        });
+      });
+    },
+  });
+}

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
-import { createGradientBackground, createButton } from '../../../shared/ui';
+import { createGradientBackground, createButton, showToast } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
+import { shareGameResult, getShareOutcomeMessage } from '../../../shared/share';
 
 const THEME = THEME_PRESETS.brainTouch;
 
@@ -19,6 +20,22 @@ export class ResultScene extends Phaser.Scene {
 
   init(data: ResultData): void {
     this.resultData = data;
+  }
+
+  private async shareResult(): Promise<void> {
+    const outcome = await shareGameResult({
+      gameId: 'brain-touch',
+      gameTitle: 'Brain Touch',
+      metricLabel: '점수',
+      metricValue: this.resultData.score,
+    });
+
+    const message = getShareOutcomeMessage(outcome);
+    if (message) {
+      showToast(this, message, {
+        color: outcome === 'unsupported' ? '#ff6b6b' : '#4ecca3',
+      });
+    }
   }
 
   create(): void {
@@ -114,11 +131,29 @@ export class ResultScene extends Phaser.Scene {
         }
       );
 
+      // 공유하기 버튼
+      createButton(
+        this,
+        width / 2,
+        height * 0.83,
+        '공유하기',
+        () => {
+          void this.shareResult();
+        },
+        {
+          bgColor: 0x5865f2,
+          hoverColor: 0x6a75f4,
+          textColor: '#ffffff',
+          width: 200,
+          height: 54,
+        }
+      );
+
       // 홈으로 버튼
       createButton(
         this,
         width / 2,
-        height * 0.88,
+        height * 0.92,
         '홈으로',
         () => {
           // React에 게임 종료 이벤트 전달 → 홈으로 이동
