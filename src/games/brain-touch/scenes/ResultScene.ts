@@ -28,8 +28,8 @@ export class ResultScene extends Phaser.Scene {
     createGradientBackground(this, width, height, BASE_COLORS.BG_DARK, BASE_COLORS.BG_PRIMARY);
 
     // 결과 제목
-    const titleText = this.resultData.timeUp ? '⏱️ 시간 종료!' : '💔 게임 오버';
-    const titleColor = this.resultData.timeUp ? '#4ecca3' : THEME.accentText;
+    const titleText = '게임 종료';
+    const titleColor = THEME.accentText;
 
     this.add
       .text(width / 2, height * 0.25, titleText, {

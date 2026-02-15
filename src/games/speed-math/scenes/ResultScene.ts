@@ -26,7 +26,7 @@ export class ResultScene extends Phaser.Scene {
 
     // 결과 타이틀
     this.add
-      .text(width / 2, height * 0.2, '🎉 완료!', {
+      .text(width / 2, height * 0.2, '게임 종료', {
         fontSize: '48px',
         fontFamily: 'Pretendard, sans-serif',
         color: BASE_COLORS.TEXT_PRIMARY,
