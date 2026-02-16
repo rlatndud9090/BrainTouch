@@ -17,7 +17,7 @@ export interface ShareGameResultInput {
 
 function buildGameUrl(gameId: string): string {
   if (typeof window === 'undefined') return '';
-  return `${window.location.origin}${window.location.pathname}#/game/${gameId}`;
+  return `${window.location.origin}${window.location.pathname}#/share/${encodeURIComponent(gameId)}`;
 }
 
 function buildShareText(input: ShareGameResultInput): string {
@@ -71,4 +71,3 @@ export function getShareOutcomeMessage(outcome: ShareOutcome): string | null {
   if (outcome === 'unsupported') return '이 기기에서는 공유를 지원하지 않아요';
   return null;
 }
-
