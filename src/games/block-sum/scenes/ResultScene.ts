@@ -113,6 +113,7 @@ export class ResultScene extends Phaser.Scene {
         textColor: '#ffffff',
         width: 200,
         height: 54,
+        triggerOnPointerDown: true,
       }
     );
 

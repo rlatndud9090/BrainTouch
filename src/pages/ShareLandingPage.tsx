@@ -19,7 +19,7 @@ export default function ShareLandingPage() {
 
   const platform = useMemo(() => {
     if (typeof navigator === 'undefined') return 'desktop';
-    return detectDevicePlatform(navigator.userAgent);
+    return detectDevicePlatform(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
   }, []);
   const stores = useMemo(() => getAvailableStores(platform), [platform]);
   const preferredStoreId = useMemo(() => {

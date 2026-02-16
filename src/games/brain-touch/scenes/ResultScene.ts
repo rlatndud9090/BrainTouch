@@ -114,11 +114,17 @@ export class ResultScene extends Phaser.Scene {
 
     // 버튼들
     this.time.delayedCall(1200, () => {
+      const buttonHeight = 54;
+      const buttonGap = 16;
+      const bottomMargin = 24;
+      const menuButtonY = height - bottomMargin - buttonHeight / 2;
+      const shareButtonY = menuButtonY - (buttonHeight + buttonGap);
+      const retryButtonY = shareButtonY - (buttonHeight + buttonGap);
       // 다시하기 버튼
       createButton(
         this,
         width / 2,
-        height * 0.78,
+        retryButtonY,
         '다시 도전',
         () => {
           this.scene.start('MainScene');
@@ -127,7 +133,7 @@ export class ResultScene extends Phaser.Scene {
           bgColor: THEME.accent,
           hoverColor: THEME.accentHover,
           width: 200,
-          height: 54,
+          height: buttonHeight,
         }
       );
 
@@ -135,7 +141,7 @@ export class ResultScene extends Phaser.Scene {
       createButton(
         this,
         width / 2,
-        height * 0.83,
+        shareButtonY,
         '공유하기',
         () => {
           void this.shareResult();
@@ -145,7 +151,8 @@ export class ResultScene extends Phaser.Scene {
           hoverColor: 0x6a75f4,
           textColor: '#ffffff',
           width: 200,
-          height: 54,
+          height: buttonHeight,
+          triggerOnPointerDown: true,
         }
       );
 
@@ -153,7 +160,7 @@ export class ResultScene extends Phaser.Scene {
       createButton(
         this,
         width / 2,
-        height * 0.92,
+        menuButtonY,
         '홈으로',
         () => {
           // React에 게임 종료 이벤트 전달 → 홈으로 이동
@@ -163,7 +170,7 @@ export class ResultScene extends Phaser.Scene {
           bgColor: BASE_COLORS.BUTTON_SECONDARY,
           hoverColor: BASE_COLORS.BUTTON_HOVER,
           width: 200,
-          height: 54,
+          height: buttonHeight,
         }
       );
     });

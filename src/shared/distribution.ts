@@ -69,10 +69,21 @@ function supportsPlatform(store: StoreDestination, platform: DevicePlatform): bo
   return store.platforms.includes('all') || store.platforms.includes(platform);
 }
 
-export function detectDevicePlatform(userAgent: string): DevicePlatform {
+export function detectDevicePlatform(
+  userAgent: string,
+  platform: string = '',
+  maxTouchPoints: number = 0
+): DevicePlatform {
   const ua = userAgent.toLowerCase();
   if (ua.includes('android')) return 'android';
   if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) return 'ios';
+
+  // iPadOS desktop UA can report "Macintosh" while still being a touch device.
+  const normalizedPlatform = platform.toLowerCase();
+  const isIpadOsDesktopMode =
+    (ua.includes('macintosh') || normalizedPlatform === 'macintel') && maxTouchPoints > 1;
+  if (isIpadOsDesktopMode) return 'ios';
+
   return 'desktop';
 }
 

@@ -50,6 +50,7 @@ export function createButton(
     width?: number;
     height?: number;
     fontSize?: string;
+    triggerOnPointerDown?: boolean;
     borderRadius?: number; // 둥근 모서리 (기본값 25)
   } = {}
 ): Phaser.GameObjects.Container {
@@ -60,6 +61,7 @@ export function createButton(
     width = 200,
     height = 50,
     fontSize = '20px',
+    triggerOnPointerDown = false,
     borderRadius = 25, // 기본적으로 둥글게
   } = options;
 
@@ -105,13 +107,21 @@ export function createButton(
 
   // 클릭 효과
   hitArea.on('pointerdown', () => {
+    if (triggerOnPointerDown) {
+      onClick();
+    }
+
     scene.tweens.add({
       targets: container,
       scaleX: 0.95,
       scaleY: 0.95,
       duration: 50,
       yoyo: true,
-      onComplete: onClick,
+      onComplete: () => {
+        if (!triggerOnPointerDown) {
+          onClick();
+        }
+      },
     });
   });
 
