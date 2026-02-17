@@ -2,11 +2,18 @@
  * 블록셈 블록 생성 유틸리티
  */
 
-export type Difficulty = 'easy' | 'normal' | 'hard';
-
 export interface BlockData {
   id: number;
   value: number;
+}
+
+export interface RoundGenerationConfig {
+  blockCount: number;
+  minValue: number;
+  maxValue: number;
+  maxRemove: number;
+  preferRemove: number;
+  maxTargetSum: number | null;
 }
 
 export interface RoundData {
@@ -15,33 +22,7 @@ export interface RoundData {
   minBlocksToKeep: number; // 최소 유지해야 할 블록 수 (점수 계산용)
 }
 
-// 난이도 설정
-const DIFFICULTY_CONFIG = {
-  easy: {
-    blockCount: 4,
-    minValue: 1,
-    maxValue: 5, // 쉬움: 1~5만
-    maxRemove: 2, // 최대 2개까지만 제거
-    preferRemove: 1, // 주로 1개 제거 (가중치)
-    maxTargetSum: 15, // 목표 숫자 최대값
-  },
-  normal: {
-    blockCount: 5,
-    minValue: 1,
-    maxValue: 9,
-    maxRemove: 2, // 최대 2개까지만 제거
-    preferRemove: 1, // 주로 1개 제거 (가중치)
-    maxTargetSum: 25, // 목표 숫자 최대값
-  },
-  hard: {
-    blockCount: 5, // 어려움도 5개로 고정
-    minValue: 1,
-    maxValue: 9,
-    maxRemove: 2, // 최대 2개까지만 제거
-    preferRemove: 1, // 주로 1개 제거 (가중치)
-    maxTargetSum: null, // 제한 없음
-  },
-} as const;
+const MAX_ROUND_GENERATION_ATTEMPTS = 30;
 
 /**
  * 랜덤 정수 생성 (min ~ max 포함)
@@ -88,61 +69,23 @@ function getAllPossibleSums(blocks: BlockData[]): Map<number, number[]> {
 /**
  * 라운드 데이터 생성
  */
-export function generateRound(difficulty: Difficulty): RoundData {
-  const config = DIFFICULTY_CONFIG[difficulty];
-  const blocks: BlockData[] = [];
+export function generateRound(config: RoundGenerationConfig): RoundData {
+  const normalizedConfig = normalizeConfig(config);
 
-  // 블록 생성
-  for (let i = 0; i < config.blockCount; i++) {
-    blocks.push({
-      id: i,
-      value: randomInt(config.minValue, config.maxValue),
-    });
-  }
+  for (let attempt = 0; attempt < MAX_ROUND_GENERATION_ATTEMPTS; attempt++) {
+    const blocks = createBlocks(normalizedConfig);
+    const selectedTarget = selectTarget(blocks, normalizedConfig, true);
 
-  // 가능한 모든 합 계산
-  const possibleSums = getAllPossibleSums(blocks);
-
-  // maxRemove 이하로 제거하는 목표만 필터링 + 목표 숫자 제한 적용
-  const validTargets: { sum: number; removeCount: number }[] = [];
-  const maxTargetSum = config.maxTargetSum;
-  for (const [sum, removedIndices] of possibleSums.entries()) {
-    const removeCount = removedIndices.length;
-    // 최소 1개는 제거해야 하고, maxRemove 이하만 허용
-    // 목표 숫자가 maxTargetSum 이하인지 체크 (null이면 제한 없음)
-    if (removeCount >= 1 && removeCount <= config.maxRemove && sum > 0) {
-      if (maxTargetSum === null || sum <= maxTargetSum) {
-        validTargets.push({ sum, removeCount });
-      }
+    if (selectedTarget) {
+      return {
+        blocks,
+        targetSum: selectedTarget.sum,
+        minBlocksToKeep: blocks.length - selectedTarget.removeCount,
+      };
     }
   }
 
-  if (validTargets.length === 0) {
-    // 조건에 맞는 목표가 없으면 다시 생성
-    return generateRound(difficulty);
-  }
-
-  // 가중치 적용: 적게 제거하는 목표를 선호
-  // preferRemove 이하는 3배 가중치
-  const weightedTargets: { sum: number; removeCount: number }[] = [];
-  for (const target of validTargets) {
-    const weight = target.removeCount <= config.preferRemove ? 3 : 1;
-    for (let i = 0; i < weight; i++) {
-      weightedTargets.push(target);
-    }
-  }
-
-  // 가중치 적용된 목표 중 랜덤 선택
-  const selected = weightedTargets[randomInt(0, weightedTargets.length - 1)];
-  const targetSum = selected.sum;
-  const minRemoveCount = selected.removeCount;
-  const minBlocksToKeep = config.blockCount - minRemoveCount;
-
-  return {
-    blocks,
-    targetSum,
-    minBlocksToKeep,
-  };
+  return generateFallbackRound(normalizedConfig);
 }
 
 /**
@@ -160,30 +103,84 @@ export function calculateSum(blocks: BlockData[]): number {
   return blocks.reduce((sum, b) => sum + b.value, 0);
 }
 
-/**
- * 난이도 이름 (한글)
- */
-export function getDifficultyName(difficulty: Difficulty): string {
-  switch (difficulty) {
-    case 'easy':
-      return '하';
-    case 'normal':
-      return '중';
-    case 'hard':
-      return '상';
-  }
+function normalizeConfig(config: RoundGenerationConfig): RoundGenerationConfig {
+  const minValue = Math.max(0, Math.floor(config.minValue));
+  const maxValue = Math.max(minValue, Math.floor(config.maxValue));
+  const blockCount = Math.max(2, Math.floor(config.blockCount));
+  const maxRemove = Math.max(1, Math.min(blockCount - 1, Math.floor(config.maxRemove)));
+  const preferRemove = Math.max(1, Math.min(maxRemove, Math.floor(config.preferRemove)));
+
+  return {
+    blockCount,
+    minValue,
+    maxValue,
+    maxRemove,
+    preferRemove,
+    maxTargetSum: config.maxTargetSum,
+  };
 }
 
-/**
- * 다음 난이도 반환
- */
-export function getNextDifficulty(current: Difficulty): Difficulty {
-  switch (current) {
-    case 'easy':
-      return 'normal';
-    case 'normal':
-      return 'hard';
-    case 'hard':
-      return 'hard';
+function createBlocks(config: RoundGenerationConfig): BlockData[] {
+  const blocks: BlockData[] = [];
+
+  for (let i = 0; i < config.blockCount; i++) {
+    blocks.push({
+      id: i,
+      value: randomInt(config.minValue, config.maxValue),
+    });
   }
+
+  return blocks;
+}
+
+function selectTarget(
+  blocks: BlockData[],
+  config: RoundGenerationConfig,
+  respectMaxTarget: boolean
+): { sum: number; removeCount: number } | null {
+  const possibleSums = getAllPossibleSums(blocks);
+  const validTargets: { sum: number; removeCount: number }[] = [];
+
+  for (const [sum, removedIndices] of possibleSums.entries()) {
+    const removeCount = removedIndices.length;
+    if (removeCount < 1 || removeCount > config.maxRemove || sum <= 0) {
+      continue;
+    }
+
+    if (respectMaxTarget && config.maxTargetSum !== null && sum > config.maxTargetSum) {
+      continue;
+    }
+
+    validTargets.push({ sum, removeCount });
+  }
+
+  if (validTargets.length === 0) {
+    return null;
+  }
+
+  const weightedTargets: { sum: number; removeCount: number }[] = [];
+  for (const target of validTargets) {
+    const weight = target.removeCount <= config.preferRemove ? 3 : 1;
+    for (let i = 0; i < weight; i++) {
+      weightedTargets.push(target);
+    }
+  }
+
+  return weightedTargets[randomInt(0, weightedTargets.length - 1)];
+}
+
+function generateFallbackRound(config: RoundGenerationConfig): RoundData {
+  const blocks = createBlocks(config);
+  const preferredTarget =
+    selectTarget(blocks, config, false) ??
+    ({
+      sum: calculateSum(blocks.slice(1)),
+      removeCount: 1,
+    } as const);
+
+  return {
+    blocks,
+    targetSum: preferredTarget.sum,
+    minBlocksToKeep: blocks.length - preferredTarget.removeCount,
+  };
 }
