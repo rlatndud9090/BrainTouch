@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
-import { createGradientBackground, createButton } from '../../../shared/ui';
+import { createGradientBackground, createButton, showToast } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
+import { shareGameResult, getShareOutcomeMessage } from '../../../shared/share';
 
 const THEME = THEME_PRESETS.brainTouch;
 
@@ -19,6 +20,22 @@ export class ResultScene extends Phaser.Scene {
 
   init(data: ResultData): void {
     this.resultData = data;
+  }
+
+  private async shareResult(): Promise<void> {
+    const outcome = await shareGameResult({
+      gameId: 'brain-touch',
+      gameTitle: 'Brain Touch',
+      metricLabel: '점수',
+      metricValue: this.resultData.score,
+    });
+
+    const message = getShareOutcomeMessage(outcome);
+    if (message) {
+      showToast(this, message, {
+        color: outcome === 'unsupported' ? '#ff6b6b' : '#4ecca3',
+      });
+    }
   }
 
   create(): void {
@@ -97,11 +114,17 @@ export class ResultScene extends Phaser.Scene {
 
     // 버튼들
     this.time.delayedCall(1200, () => {
+      const buttonHeight = 54;
+      const buttonGap = 16;
+      const bottomMargin = 24;
+      const menuButtonY = height - bottomMargin - buttonHeight / 2;
+      const shareButtonY = menuButtonY - (buttonHeight + buttonGap);
+      const retryButtonY = shareButtonY - (buttonHeight + buttonGap);
       // 다시하기 버튼
       createButton(
         this,
         width / 2,
-        height * 0.78,
+        retryButtonY,
         '다시 도전',
         () => {
           this.scene.start('MainScene');
@@ -110,7 +133,26 @@ export class ResultScene extends Phaser.Scene {
           bgColor: THEME.accent,
           hoverColor: THEME.accentHover,
           width: 200,
-          height: 54,
+          height: buttonHeight,
+        }
+      );
+
+      // 공유하기 버튼
+      createButton(
+        this,
+        width / 2,
+        shareButtonY,
+        '공유하기',
+        () => {
+          void this.shareResult();
+        },
+        {
+          bgColor: 0x5865f2,
+          hoverColor: 0x6a75f4,
+          textColor: '#ffffff',
+          width: 200,
+          height: buttonHeight,
+          triggerOnPointerDown: true,
         }
       );
 
@@ -118,7 +160,7 @@ export class ResultScene extends Phaser.Scene {
       createButton(
         this,
         width / 2,
-        height * 0.88,
+        menuButtonY,
         '홈으로',
         () => {
           // React에 게임 종료 이벤트 전달 → 홈으로 이동
@@ -128,7 +170,7 @@ export class ResultScene extends Phaser.Scene {
           bgColor: BASE_COLORS.BUTTON_SECONDARY,
           hoverColor: BASE_COLORS.BUTTON_HOVER,
           width: 200,
-          height: 54,
+          height: buttonHeight,
         }
       );
     });

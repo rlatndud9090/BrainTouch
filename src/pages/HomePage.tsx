@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import GameCard from '../components/GameCard';
 
 // 게임 목록 데이터 (추후 확장)
@@ -39,13 +38,10 @@ export default function HomePage() {
   return (
     <div className="w-full h-full flex flex-col bg-toss-black">
       {/* 헤더 */}
-      <header className="flex items-center justify-between px-5 py-4 border-b border-toss-gray-600">
+      <header className="flex items-center px-5 py-4 border-b border-toss-gray-600">
         <h1 className="text-xl font-bold">
           <span className="font-game text-2xl">🧮</span> 브레인 터치 - 계산편
         </h1>
-        <Link to="/ranking" className="text-toss-blue text-sm font-medium">
-          랭킹
-        </Link>
       </header>
 
       {/* 폰트 프리로드용 숨겨진 텍스트 (Cherry Bomb One) */}

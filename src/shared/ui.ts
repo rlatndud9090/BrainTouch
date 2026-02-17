@@ -50,6 +50,7 @@ export function createButton(
     width?: number;
     height?: number;
     fontSize?: string;
+    triggerOnPointerDown?: boolean;
     borderRadius?: number; // 둥근 모서리 (기본값 25)
   } = {}
 ): Phaser.GameObjects.Container {
@@ -60,6 +61,7 @@ export function createButton(
     width = 200,
     height = 50,
     fontSize = '20px',
+    triggerOnPointerDown = false,
     borderRadius = 25, // 기본적으로 둥글게
   } = options;
 
@@ -105,13 +107,21 @@ export function createButton(
 
   // 클릭 효과
   hitArea.on('pointerdown', () => {
+    if (triggerOnPointerDown) {
+      onClick();
+    }
+
     scene.tweens.add({
       targets: container,
       scaleX: 0.95,
       scaleY: 0.95,
       duration: 50,
       yoyo: true,
-      onComplete: onClick,
+      onComplete: () => {
+        if (!triggerOnPointerDown) {
+          onClick();
+        }
+      },
     });
   });
 
@@ -285,4 +295,56 @@ export function formatTime(ms: number, showDecimals = false): string {
   }
 
   return `${seconds}초`;
+}
+
+/**
+ * 짧게 사라지는 토스트 메시지 표시
+ */
+export function showToast(
+  scene: Phaser.Scene,
+  message: string,
+  options: {
+    x?: number;
+    y?: number;
+    color?: string;
+    durationMs?: number;
+    fontSize?: string;
+  } = {}
+): void {
+  const { width, height } = scene.scale;
+  const {
+    x = width / 2,
+    y = height * 0.94,
+    color = '#4ecca3',
+    durationMs = 1200,
+    fontSize = '16px',
+  } = options;
+
+  const toast = scene.add
+    .text(x, y, message, {
+      fontSize,
+      fontFamily: 'Pretendard, sans-serif',
+      color,
+      fontStyle: 'bold',
+      align: 'center',
+    })
+    .setOrigin(0.5)
+    .setDepth(999)
+    .setAlpha(0);
+
+  scene.tweens.add({
+    targets: toast,
+    alpha: 1,
+    duration: 120,
+    onComplete: () => {
+      scene.time.delayedCall(durationMs, () => {
+        scene.tweens.add({
+          targets: toast,
+          alpha: 0,
+          duration: 180,
+          onComplete: () => toast.destroy(),
+        });
+      });
+    },
+  });
 }
