@@ -29,8 +29,13 @@ const TRAIL_SWAP_INTERVAL_MS = 125; // 1초에 8회
 const MEDIAN_HIT_DURATION_MS = 500;
 const PLAYER_SIZE_FACTOR = 1.35;
 const METEOR_CORE_DISPLAY_FACTOR = 3.0;
-const METEOR_TRAIL_DISPLAY_FACTOR = 2.0;
 const METEOR_SPLIT_DISPLAY_FACTOR = 3.1;
+const METEOR_FLAME_WRAP_WIDTH_FACTOR = 5.0;
+const METEOR_FLAME_WRAP_HEIGHT_FACTOR = 3.2;
+
+const DEPTH_METEOR = 120;
+const DEPTH_PLAYER = 180;
+const DEPTH_EFFECT = 220;
 
 const TEXTURE_KEYS = {
   ship: 'math-flight-ship-player',
@@ -224,6 +229,7 @@ export class GameScene extends Phaser.Scene {
       .image(0, 0, TEXTURE_KEYS.ship)
       .setDisplaySize(this.playerSize, this.playerSize);
     this.player.add(this.playerBody);
+    this.player.setDepth(DEPTH_PLAYER);
   }
 
   private setupInput(): void {
@@ -303,11 +309,13 @@ export class GameScene extends Phaser.Scene {
     const y = this.meteorStartY;
 
     const container = this.add.container(x, y);
+    container.setDepth(DEPTH_METEOR);
 
     const trail = this.add
-      .image(0, -this.meteorRadius * 1.55, TRAIL_TEXTURE_ORDER[0])
-      .setDisplaySize(this.meteorRadius * METEOR_TRAIL_DISPLAY_FACTOR, this.meteorRadius * METEOR_TRAIL_DISPLAY_FACTOR)
-      .setAlpha(0.95);
+      .image(0, 0, TRAIL_TEXTURE_ORDER[0])
+      .setDisplaySize(this.meteorRadius * METEOR_FLAME_WRAP_WIDTH_FACTOR, this.meteorRadius * METEOR_FLAME_WRAP_HEIGHT_FACTOR)
+      .setAlpha(0.9)
+      .setBlendMode(Phaser.BlendModes.ADD);
 
     const core = this.add
       .image(0, 0, TEXTURE_KEYS.meteorCore)
@@ -510,7 +518,8 @@ export class GameScene extends Phaser.Scene {
         color: '#ffc947',
         fontStyle: 'bold',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(DEPTH_EFFECT + 10);
 
     this.tweens.add({
       targets: popup,
@@ -523,7 +532,7 @@ export class GameScene extends Phaser.Scene {
 
     // 플래시 효과
     const { width, height } = this.scale;
-    const flash = this.add.rectangle(0, 0, width, height, color, 0.2).setOrigin(0, 0);
+    const flash = this.add.rectangle(0, 0, width, height, color, 0.2).setOrigin(0, 0).setDepth(DEPTH_EFFECT);
 
     this.tweens.add({
       targets: flash,
@@ -537,7 +546,7 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     // 화면 빨간색 플래시
-    const flash = this.add.rectangle(0, 0, width, height, THEME.failFlash, 0.3).setOrigin(0, 0);
+    const flash = this.add.rectangle(0, 0, width, height, THEME.failFlash, 0.3).setOrigin(0, 0).setDepth(DEPTH_EFFECT);
 
     this.tweens.add({
       targets: flash,
