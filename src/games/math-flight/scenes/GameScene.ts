@@ -26,10 +26,8 @@ const LANE_POSITIONS = [0.2, 0.5, 0.8];
 // 운석 크기 margin (레인 너비 대비)
 const METEOR_MARGIN = 0.15; // 15% margin 양쪽
 const TRAIL_SWAP_INTERVAL_MS = 125; // 1초에 8회
-const MEDIAN_HIT_DURATION_MS = 500;
-const PLAYER_SIZE_FACTOR = 1.35;
+const PLAYER_SIZE_FACTOR = 1.485;
 const METEOR_CORE_DISPLAY_FACTOR = 3.0;
-const METEOR_SPLIT_DISPLAY_FACTOR = 3.1;
 const METEOR_FLAME_WRAP_WIDTH_FACTOR = 5.0;
 const METEOR_FLAME_WRAP_HEIGHT_FACTOR = 3.2;
 
@@ -40,7 +38,6 @@ const DEPTH_EFFECT = 220;
 const TEXTURE_KEYS = {
   ship: 'math-flight-ship-player',
   meteorCore: 'math-flight-meteor-core',
-  meteorSplitHit: 'math-flight-meteor-split-hit',
   meteorTrail1: 'math-flight-meteor-trail-1',
   meteorTrail2: 'math-flight-meteor-trail-2',
 } as const;
@@ -48,7 +45,6 @@ const TEXTURE_KEYS = {
 const TEXTURE_URLS = {
   ship: new URL('../../../assets/sprites/math-flight/ship_player.png', import.meta.url).href,
   meteorCore: new URL('../../../assets/sprites/math-flight/meteor_core.png', import.meta.url).href,
-  meteorSplitHit: new URL('../../../assets/sprites/math-flight/meteor_split_hit.png', import.meta.url).href,
   meteorTrail1: new URL('../../../assets/sprites/math-flight/meteor_trail_flame1.png', import.meta.url).href,
   meteorTrail2: new URL('../../../assets/sprites/math-flight/meteor_trail_flame2.png', import.meta.url).href,
 } as const;
@@ -108,7 +104,6 @@ export class GameScene extends Phaser.Scene {
   preload(): void {
     this.loadTextureIfMissing(TEXTURE_KEYS.ship, TEXTURE_URLS.ship);
     this.loadTextureIfMissing(TEXTURE_KEYS.meteorCore, TEXTURE_URLS.meteorCore);
-    this.loadTextureIfMissing(TEXTURE_KEYS.meteorSplitHit, TEXTURE_URLS.meteorSplitHit);
     this.loadTextureIfMissing(TEXTURE_KEYS.meteorTrail1, TEXTURE_URLS.meteorTrail1);
     this.loadTextureIfMissing(TEXTURE_KEYS.meteorTrail2, TEXTURE_URLS.meteorTrail2);
   }
@@ -312,7 +307,7 @@ export class GameScene extends Phaser.Scene {
     container.setDepth(DEPTH_METEOR);
 
     const trail = this.add
-      .image(0, 0, TRAIL_TEXTURE_ORDER[0])
+      .image(0, -this.meteorRadius * 0.22, TRAIL_TEXTURE_ORDER[0])
       .setDisplaySize(this.meteorRadius * METEOR_FLAME_WRAP_WIDTH_FACTOR, this.meteorRadius * METEOR_FLAME_WRAP_HEIGHT_FACTOR)
       .setAlpha(0.9)
       .setBlendMode(Phaser.BlendModes.ADD);
@@ -460,15 +455,13 @@ export class GameScene extends Phaser.Scene {
       const earnedScore = 200;
       this.score += earnedScore;
       this.successfulHits++;
-      this.showSuccessEffect(meteor, earnedScore);
-      this.playMedianHitSprite(meteor);
 
       if (this.successfulHits > 0 && this.successfulHits % ROUND_UPGRADE_INTERVAL === 0) {
         this.applyDifficultyUpgrade();
       }
 
       this.topBar.updateValue('right', this.score);
-      return false;
+      return true;
     } else {
       this.applyDifficultyDowngradeOnFail();
       const isGameOver = this.topBar.loseLife('left');
@@ -484,17 +477,6 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  private playMedianHitSprite(meteor: MeteorSprite): void {
-    meteor.trail.destroy();
-    meteor.label.setVisible(false);
-    meteor.core.setTexture(TEXTURE_KEYS.meteorSplitHit);
-    meteor.core.setDisplaySize(this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR, this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR);
-
-    this.time.delayedCall(MEDIAN_HIT_DURATION_MS, () => {
-      meteor.container.destroy();
-    });
-  }
-
   private applyDifficultyUpgrade(): void {
     const upgradeResult = upgradeDifficulty(this.difficultyLevels, this.difficultyUpgradeHistory);
     this.difficultyLevels = upgradeResult.levels;
@@ -504,42 +486,6 @@ export class GameScene extends Phaser.Scene {
   private applyDifficultyDowngradeOnFail(): void {
     const downgradeResult = downgradeDifficultyOnFail(this.difficultyLevels);
     this.difficultyLevels = downgradeResult.levels;
-  }
-
-  private showSuccessEffect(meteor: MeteorSprite, score: number): void {
-    const color = THEME.medianFlash;
-    const text = `+${score}`;
-
-    // 점수 팝업
-    const popup = this.add
-      .text(meteor.container.x, meteor.container.y, text, {
-        fontSize: '24px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#ffc947',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(DEPTH_EFFECT + 10);
-
-    this.tweens.add({
-      targets: popup,
-      y: popup.y - 40,
-      alpha: 0,
-      duration: 800,
-      ease: 'Power2',
-      onComplete: () => popup.destroy(),
-    });
-
-    // 플래시 효과
-    const { width, height } = this.scale;
-    const flash = this.add.rectangle(0, 0, width, height, color, 0.2).setOrigin(0, 0).setDepth(DEPTH_EFFECT);
-
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      duration: 200,
-      onComplete: () => flash.destroy(),
-    });
   }
 
   private showFailEffect(): void {
