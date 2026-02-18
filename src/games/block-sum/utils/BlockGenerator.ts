@@ -23,6 +23,7 @@ export interface RoundData {
 }
 
 const MAX_ROUND_GENERATION_ATTEMPTS = 30;
+const MAX_FALLBACK_ATTEMPTS = 40;
 
 /**
  * 랜덤 정수 생성 (min ~ max 포함)
@@ -170,17 +171,36 @@ function selectTarget(
 }
 
 function generateFallbackRound(config: RoundGenerationConfig): RoundData {
-  const blocks = createBlocks(config);
-  const preferredTarget =
-    selectTarget(blocks, config, false) ??
-    ({
-      sum: calculateSum(blocks.slice(1)),
-      removeCount: 1,
-    } as const);
+  for (let attempt = 0; attempt < MAX_FALLBACK_ATTEMPTS; attempt++) {
+    const blocks = createBlocks(config);
+    const target = selectTarget(blocks, config, true);
+    if (target) {
+      return {
+        blocks,
+        targetSum: target.sum,
+        minBlocksToKeep: blocks.length - target.removeCount,
+      };
+    }
+  }
+
+  // 최후 fallback: 최솟값 블록 구성으로 maxTargetSum 조건을 강제 충족
+  const minBlocks = createMinimumBlocks(config);
+  const minTarget = selectTarget(minBlocks, config, true);
+
+  if (!minTarget) {
+    throw new Error('[block-sum] maxTargetSum 조건을 만족하는 fallback 생성 실패');
+  }
 
   return {
-    blocks,
-    targetSum: preferredTarget.sum,
-    minBlocksToKeep: blocks.length - preferredTarget.removeCount,
+    blocks: minBlocks,
+    targetSum: minTarget.sum,
+    minBlocksToKeep: minBlocks.length - minTarget.removeCount,
   };
+}
+
+function createMinimumBlocks(config: RoundGenerationConfig): BlockData[] {
+  return Array.from({ length: config.blockCount }, (_, i) => ({
+    id: i,
+    value: config.minValue,
+  }));
 }

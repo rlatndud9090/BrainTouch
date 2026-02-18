@@ -2,11 +2,13 @@ import Phaser from 'phaser';
 import { BlockData, RoundData, generateRound, canAchieveTarget, calculateSum } from '../utils/BlockGenerator';
 import {
   DifficultyAxis,
+  DifficultyDowngradeResult,
   DifficultyAxisLevels,
   RoundTelemetryEntry,
   ROUND_UPGRADE_INTERVAL,
   createInitialDifficultyLevels,
   resolveRoundDifficulty,
+  downgradeDifficultyOnFail,
   upgradeDifficulty,
   getDifficultyName,
   getDifficultyScore,
@@ -45,10 +47,6 @@ export class GameScene extends Phaser.Scene {
   private currentDifficultyScore = 0;
   private maxDifficultyScore = 0;
   private maxDifficultyName = '하';
-
-  private consecutiveFails = 0;
-  private pendingAssistRound = false;
-  private assistAppliedThisRound = false;
 
   private roundTimeLimit = 0;
   private roundTimeLeft = 0;
@@ -95,10 +93,6 @@ export class GameScene extends Phaser.Scene {
     this.maxDifficultyScore = this.currentDifficultyScore;
     this.maxDifficultyName = getDifficultyName(this.difficultyLevels);
 
-    this.consecutiveFails = 0;
-    this.pendingAssistRound = false;
-    this.assistAppliedThisRound = false;
-
     this.roundTimeLimit = 0;
     this.roundTimeLeft = 0;
     this.currentRoundNumber = 1;
@@ -110,7 +104,7 @@ export class GameScene extends Phaser.Scene {
     this.calculateLayout(width, height);
     createGradientBackground(this, width, height);
 
-    const firstRoundDifficulty = resolveRoundDifficulty(1, this.difficultyLevels, false);
+    const firstRoundDifficulty = resolveRoundDifficulty(1, this.difficultyLevels);
     this.createHUD(firstRoundDifficulty.timeLimit);
     this.createTargetArea(width, height);
 
@@ -216,20 +210,9 @@ export class GameScene extends Phaser.Scene {
     this.blockSprites = [];
 
     this.currentRoundNumber = this.clearedRounds + 1;
-    const roundDifficulty = resolveRoundDifficulty(
-      this.currentRoundNumber,
-      this.difficultyLevels,
-      this.pendingAssistRound
-    );
-
-    this.pendingAssistRound = false;
-    this.assistAppliedThisRound = roundDifficulty.assistApplied;
+    const roundDifficulty = resolveRoundDifficulty(this.currentRoundNumber, this.difficultyLevels);
     this.currentDifficultyScore = roundDifficulty.difficultyScore;
     this.trackMaxDifficulty(roundDifficulty.difficultyScore, roundDifficulty.difficultyName);
-
-    if (this.assistAppliedThisRound) {
-      this.showAssistFeedback();
-    }
 
     this.currentRound = generateRound(roundDifficulty.generationConfig);
     this.targetText.setText(String(this.currentRound.targetSum));
@@ -371,7 +354,6 @@ export class GameScene extends Phaser.Scene {
     this.recordRoundOutcome('success');
 
     this.clearedRounds++;
-    this.consecutiveFails = 0;
 
     const baseScore = 100;
     const bonusMultiplier = remainingBlockCount;
@@ -398,11 +380,7 @@ export class GameScene extends Phaser.Scene {
     this.roundTimerEvent?.destroy();
     this.isAnimating = true;
     this.recordRoundOutcome('fail');
-
-    this.consecutiveFails++;
-    if (this.consecutiveFails >= 2) {
-      this.pendingAssistRound = true;
-    }
+    this.applyDifficultyDowngradeOnFail();
 
     const isGameOver = this.topBar.loseLife('left');
     this.showFailFeedback();
@@ -436,6 +414,15 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  private applyDifficultyDowngradeOnFail(): void {
+    const downgradeResult: DifficultyDowngradeResult = downgradeDifficultyOnFail(this.difficultyLevels);
+    this.difficultyLevels = downgradeResult.levels;
+
+    if (downgradeResult.downgradedAxis) {
+      this.showDifficultyDowngradeFeedback(downgradeResult.downgradedAxis);
+    }
+  }
+
   private recordRoundOutcome(outcome: 'success' | 'fail'): void {
     if (this.roundOutcomeRecorded) return;
     this.roundOutcomeRecorded = true;
@@ -446,7 +433,6 @@ export class GameScene extends Phaser.Scene {
       outcome,
       elapsedMs,
       timeLimitSec: this.roundTimeLimit,
-      assistApplied: this.assistAppliedThisRound,
       difficultyScore: this.currentDifficultyScore,
     });
   }
@@ -484,11 +470,12 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private showAssistFeedback(): void {
+  private showDifficultyDowngradeFeedback(axis: Exclude<DifficultyAxis, 'blockCount'>): void {
     const { width, height } = this.scale;
+    const axisLabel = this.getAxisLabel(axis);
 
     const text = this.add
-      .text(width / 2, height * 0.19, '안전 보정 적용: 이번 라운드 완화', {
+      .text(width / 2, height * 0.19, `난이도 완화: ${axisLabel}`, {
         fontSize: '18px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#4ecca3',

@@ -31,7 +31,6 @@ export interface ResolvedRoundDifficulty {
   timeLimit: number;
   difficultyScore: number;
   difficultyName: string;
-  assistApplied: boolean;
 }
 
 export interface DifficultyUpgradeResult {
@@ -42,6 +41,11 @@ export interface DifficultyUpgradeResult {
   reachedMaxDifficulty: boolean;
 }
 
+export interface DifficultyDowngradeResult {
+  levels: DifficultyAxisLevels;
+  downgradedAxis: Exclude<DifficultyAxis, 'blockCount'> | null;
+}
+
 export type RoundOutcome = 'success' | 'fail';
 
 export interface RoundTelemetryEntry {
@@ -49,7 +53,6 @@ export interface RoundTelemetryEntry {
   outcome: RoundOutcome;
   elapsedMs: number;
   timeLimitSec: number;
-  assistApplied: boolean;
   difficultyScore: number;
 }
 
@@ -114,11 +117,14 @@ const MAX_LEVEL_BY_AXIS: Record<DifficultyAxis, number> = {
 };
 
 const MAX_UPGRADE_SCORE_DELTA = 0.2;
-const ASSIST_TIME_MULTIPLIER = 1.15;
 const HISTORY_LIMIT = 12;
-const ASSIST_ROUNDING_DIGITS = 1;
 
 export const ROUND_UPGRADE_INTERVAL = 4;
+const FAILURE_DOWNGRADE_AXES: readonly Exclude<DifficultyAxis, 'blockCount'>[] = [
+  'targetComplexity',
+  'timePressure',
+  'numberRange',
+];
 
 const AXES: readonly DifficultyAxis[] = [
   'blockCount',
@@ -180,34 +186,37 @@ export function getScoreMultiplier(difficultyScore: number): number {
 
 export function resolveRoundDifficulty(
   round: number,
-  levels: DifficultyAxisLevels,
-  assistRequested: boolean
+  levels: DifficultyAxisLevels
 ): ResolvedRoundDifficulty {
   const baseDifficultyScore = getDifficultyScore(levels);
   const baseDifficultyName = getDifficultyName(levels);
   const baseGeneration = resolveGenerationConfig(levels);
   const baseTiming = resolveTimePressureConfig(levels);
 
-  if (!assistRequested) {
-    return {
-      generationConfig: baseGeneration,
-      timeLimit: getRoundTimeLimit(round, baseTiming),
-      difficultyScore: baseDifficultyScore,
-      difficultyName: baseDifficultyName,
-      assistApplied: false,
-    };
-  }
-
-  const softenedLevels = createAssistLevels(levels);
-  const assistGeneration = resolveGenerationConfig(softenedLevels);
-  const assistTiming = applyAssistToTiming(baseTiming);
-
   return {
-    generationConfig: assistGeneration,
-    timeLimit: getRoundTimeLimit(round, assistTiming),
+    generationConfig: baseGeneration,
+    timeLimit: getRoundTimeLimit(round, baseTiming),
     difficultyScore: baseDifficultyScore,
     difficultyName: baseDifficultyName,
-    assistApplied: true,
+  };
+}
+
+export function downgradeDifficultyOnFail(levels: DifficultyAxisLevels): DifficultyDowngradeResult {
+  for (const axis of FAILURE_DOWNGRADE_AXES) {
+    if (levels[axis] > 0) {
+      return {
+        levels: {
+          ...levels,
+          [axis]: levels[axis] - 1,
+        },
+        downgradedAxis: axis,
+      };
+    }
+  }
+
+  return {
+    levels: { ...levels },
+    downgradedAxis: null,
   };
 }
 
@@ -349,32 +358,6 @@ function resolveGenerationConfig(levels: DifficultyAxisLevels): RoundGenerationC
 
 function resolveTimePressureConfig(levels: DifficultyAxisLevels): TimePressureConfig {
   return TIME_PRESSURE_LEVELS[clamp(levels.timePressure, 0, MAX_LEVEL_BY_AXIS.timePressure)];
-}
-
-function createAssistLevels(levels: DifficultyAxisLevels): DifficultyAxisLevels {
-  if (levels.targetComplexity > 0) {
-    return {
-      ...levels,
-      targetComplexity: levels.targetComplexity - 1,
-    };
-  }
-
-  if (levels.numberRange > 0) {
-    return {
-      ...levels,
-      numberRange: levels.numberRange - 1,
-    };
-  }
-
-  return { ...levels };
-}
-
-function applyAssistToTiming(timing: TimePressureConfig): TimePressureConfig {
-  return {
-    early: roundTo(timing.early * ASSIST_TIME_MULTIPLIER, ASSIST_ROUNDING_DIGITS),
-    mid: roundTo(timing.mid * ASSIST_TIME_MULTIPLIER, ASSIST_ROUNDING_DIGITS),
-    late: roundTo(timing.late * ASSIST_TIME_MULTIPLIER, ASSIST_ROUNDING_DIGITS),
-  };
 }
 
 function getRoundTimeLimit(round: number, timing: TimePressureConfig): number {
