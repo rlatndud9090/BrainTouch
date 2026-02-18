@@ -27,6 +27,10 @@ const LANE_POSITIONS = [0.2, 0.5, 0.8];
 const METEOR_MARGIN = 0.15; // 15% margin 양쪽
 const TRAIL_SWAP_INTERVAL_MS = 125; // 1초에 8회
 const MEDIAN_HIT_DURATION_MS = 500;
+const PLAYER_SIZE_FACTOR = 1.35;
+const METEOR_CORE_DISPLAY_FACTOR = 3.0;
+const METEOR_TRAIL_DISPLAY_FACTOR = 2.0;
+const METEOR_SPLIT_DISPLAY_FACTOR = 3.1;
 
 const TEXTURE_KEYS = {
   ship: 'math-flight-ship-player',
@@ -153,7 +157,7 @@ export class GameScene extends Phaser.Scene {
 
     // 운석 반지름: 레인 너비의 절반에서 margin 제외
     this.meteorRadius = (this.laneWidth / 2) * (1 - METEOR_MARGIN);
-    this.playerSize = Math.max(54, Math.round(this.meteorRadius * 0.85));
+    this.playerSize = Math.max(72, Math.round(this.meteorRadius * PLAYER_SIZE_FACTOR));
     this.playerEdgePadding = Math.max(30, Math.round(this.playerSize * 0.45));
 
     this.playerY = height * 0.85;
@@ -301,13 +305,13 @@ export class GameScene extends Phaser.Scene {
     const container = this.add.container(x, y);
 
     const trail = this.add
-      .image(0, -this.meteorRadius * 1.2, TRAIL_TEXTURE_ORDER[0])
-      .setDisplaySize(this.meteorRadius * 1.45, this.meteorRadius * 1.45)
+      .image(0, -this.meteorRadius * 1.55, TRAIL_TEXTURE_ORDER[0])
+      .setDisplaySize(this.meteorRadius * METEOR_TRAIL_DISPLAY_FACTOR, this.meteorRadius * METEOR_TRAIL_DISPLAY_FACTOR)
       .setAlpha(0.95);
 
     const core = this.add
       .image(0, 0, TEXTURE_KEYS.meteorCore)
-      .setDisplaySize(this.meteorRadius * 2, this.meteorRadius * 2);
+      .setDisplaySize(this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR, this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR);
 
     // 숫자 텍스트 (Cherry Bomb One 폰트)
     const fontSize = Math.max(18, Math.floor(this.meteorRadius * 0.75));
@@ -476,7 +480,7 @@ export class GameScene extends Phaser.Scene {
     meteor.trail.destroy();
     meteor.label.setVisible(false);
     meteor.core.setTexture(TEXTURE_KEYS.meteorSplitHit);
-    meteor.core.setDisplaySize(this.meteorRadius * 2.05, this.meteorRadius * 2.05);
+    meteor.core.setDisplaySize(this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR, this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR);
 
     this.time.delayedCall(MEDIAN_HIT_DURATION_MS, () => {
       meteor.container.destroy();
