@@ -1,22 +1,27 @@
 import Phaser from 'phaser';
 import {
   MeteorData,
-  Difficulty,
   generateMeteors,
-  getDifficulty,
-  getSpeedMultiplier,
   isSuccessMeteor,
-  isMedianMeteor,
 } from '../utils/MeteorGenerator';
+import {
+  DifficultyAxis,
+  DifficultyAxisLevels,
+  ROUND_UPGRADE_INTERVAL,
+  createInitialDifficultyLevels,
+  downgradeDifficultyOnFail,
+  resolveRoundDifficulty,
+  upgradeDifficulty,
+} from '../utils/DifficultyDirector';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
 import { showStartScreen } from '../../../shared/ui';
-import { TopBar, TOP_BAR } from '../../../shared/topBar';
+import { TopBar } from '../../../shared/topBar';
 import { FONTS } from '../../../shared/constants';
 
 const THEME = THEME_PRESETS.mathFlight;
 
 // 레인 X 좌표 비율
-const LANE_POSITIONS = [0.1, 0.3, 0.5, 0.7, 0.9];
+const LANE_POSITIONS = [0.2, 0.5, 0.8];
 
 // 운석 크기 margin (레인 너비 대비)
 const METEOR_MARGIN = 0.15; // 15% margin 양쪽
@@ -33,12 +38,15 @@ export class GameScene extends Phaser.Scene {
   // 게임 상태
   private score = 0;
   private turnCount = 0;
+  private successfulHits = 0;
   private playerX = 0;
   private startTime = 0;
   private isPlaying = false;
   private hasCollidedThisWave = false;
-  private currentDifficulty: Difficulty = 'easy';
   private isPointerDown = false; // 드래그 상태 추적
+  private difficultyLevels: DifficultyAxisLevels = createInitialDifficultyLevels();
+  private difficultyUpgradeHistory: DifficultyAxis[] = [];
+  private currentSpeedMultiplier = 1;
 
   // UI 요소
   private topBar!: TopBar;
@@ -87,7 +95,7 @@ export class GameScene extends Phaser.Scene {
     // 시작 화면 표시
     showStartScreen(this, {
       title: '🚀 중간값 운석을 맞추세요!',
-      subtitle: '5개 중 가장 큰/작은 수를 피하고\n중간 3개를 맞추면 성공',
+      subtitle: '3개 중 정확히 중간값만 맞추면 성공',
       onStart: () => this.startGame(),
     });
 
@@ -114,12 +122,15 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     // lives는 LivesManager에서 관리
     this.turnCount = 0;
+    this.successfulHits = 0;
     this.playerX = this.scale.width / 2;
-    this.currentDifficulty = 'easy';
     this.isPlaying = false;
     this.isPointerDown = false;
     this.hasCollidedThisWave = false;
     this.meteors = [];
+    this.difficultyLevels = createInitialDifficultyLevels();
+    this.difficultyUpgradeHistory = [];
+    this.currentSpeedMultiplier = 1;
   }
 
   private createBackground(width: number, height: number): void {
@@ -139,7 +150,7 @@ export class GameScene extends Phaser.Scene {
     const graphics = this.add.graphics();
     graphics.lineStyle(1, BASE_COLORS.LANE_LINE, 0.3);
 
-    for (let i = 1; i < 5; i++) {
+    for (let i = 1; i < LANE_POSITIONS.length; i++) {
       const x = width * ((LANE_POSITIONS[i - 1] + LANE_POSITIONS[i]) / 2);
       graphics.lineBetween(x, 60, x, height - 50);
     }
@@ -236,11 +247,12 @@ export class GameScene extends Phaser.Scene {
     // 충돌 플래그 리셋
     this.hasCollidedThisWave = false;
 
-    // 난이도 업데이트
-    this.currentDifficulty = getDifficulty(this.turnCount);
+    const round = this.turnCount + 1;
+    const roundDifficulty = resolveRoundDifficulty(round, this.difficultyLevels);
+    this.currentSpeedMultiplier = roundDifficulty.speedMultiplier;
 
     // 운석 생성
-    const meteorData = generateMeteors(this.currentDifficulty);
+    const meteorData = generateMeteors(roundDifficulty.generationConfig);
 
     // 운석 스프라이트 생성
     meteorData.forEach((data) => {
@@ -296,8 +308,7 @@ export class GameScene extends Phaser.Scene {
 
   private updateMeteors(delta: number): void {
     const { height } = this.scale;
-    const speedMultiplier = getSpeedMultiplier(this.currentDifficulty);
-    const currentSpeed = this.baseSpeed * speedMultiplier;
+    const currentSpeed = this.baseSpeed * this.currentSpeedMultiplier;
 
     this.meteors.forEach((meteor) => {
       meteor.y += currentSpeed * delta;
@@ -373,15 +384,16 @@ export class GameScene extends Phaser.Scene {
     const { type } = meteor.data;
 
     if (isSuccessMeteor(type)) {
-      // 성공!
-      const baseScore = 100;
-      const multiplier = isMedianMeteor(type) ? 2 : 1;
-      const earnedScore = baseScore * multiplier;
-
+      const earnedScore = 200;
       this.score += earnedScore;
-      this.showSuccessEffect(meteor, earnedScore, isMedianMeteor(type));
+      this.successfulHits++;
+      this.showSuccessEffect(meteor, earnedScore);
+
+      if (this.successfulHits > 0 && this.successfulHits % ROUND_UPGRADE_INTERVAL === 0) {
+        this.applyDifficultyUpgrade();
+      }
     } else {
-      // 실패 (min 또는 max)
+      this.applyDifficultyDowngradeOnFail();
       const isGameOver = this.topBar.loseLife('left');
       this.showFailEffect();
 
@@ -394,16 +406,27 @@ export class GameScene extends Phaser.Scene {
     this.topBar.updateValue('right', this.score);
   }
 
-  private showSuccessEffect(meteor: MeteorSprite, score: number, isMedian: boolean): void {
-    const color = isMedian ? THEME.medianFlash : THEME.successFlash;
-    const text = isMedian ? `+${score} x2!` : `+${score}`;
+  private applyDifficultyUpgrade(): void {
+    const upgradeResult = upgradeDifficulty(this.difficultyLevels, this.difficultyUpgradeHistory);
+    this.difficultyLevels = upgradeResult.levels;
+    this.difficultyUpgradeHistory = upgradeResult.history;
+  }
+
+  private applyDifficultyDowngradeOnFail(): void {
+    const downgradeResult = downgradeDifficultyOnFail(this.difficultyLevels);
+    this.difficultyLevels = downgradeResult.levels;
+  }
+
+  private showSuccessEffect(meteor: MeteorSprite, score: number): void {
+    const color = THEME.medianFlash;
+    const text = `+${score}`;
 
     // 점수 팝업
     const popup = this.add
       .text(meteor.container.x, meteor.container.y, text, {
         fontSize: '24px',
         fontFamily: 'Pretendard, sans-serif',
-        color: isMedian ? '#ffc947' : '#4ecca3',
+        color: '#ffc947',
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
