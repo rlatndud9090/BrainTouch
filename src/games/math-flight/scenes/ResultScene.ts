@@ -38,7 +38,7 @@ export class ResultScene extends Phaser.Scene {
   private async shareResult(): Promise<void> {
     const outcome = await shareGameResult({
       gameId: 'math-flight',
-      gameTitle: '매스 플라이트',
+      gameTitle: '중간값 비행',
       metricLabel: '점수',
       metricValue: this.totalScore,
     });

@@ -4,7 +4,7 @@ import GameCard from '../components/GameCard';
 const games = [
   {
     id: 'brain-touch',
-    title: '🧠 Brain Touch',
+    title: '🧠 몸풀기 터치',
     description: '빠른 터치로 두뇌를 깨워보세요!',
     color: 'from-purple-500 to-pink-500',
   },
@@ -16,7 +16,7 @@ const games = [
   },
   {
     id: 'math-flight',
-    title: '🚀 매스 플라이트',
+    title: '🚀 중간값 비행',
     description: '운석을 피하며 중간값을 찾아라!',
     color: 'from-cyan-500 to-blue-500',
   },

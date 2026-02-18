@@ -7,7 +7,7 @@ export interface GameCatalogItem {
 export const GAME_CATALOG: GameCatalogItem[] = [
   {
     id: 'brain-touch',
-    title: 'Brain Touch',
+    title: '몸풀기 터치',
     description: '터치 반응 속도로 점수를 올리는 게임',
   },
   {
@@ -17,7 +17,7 @@ export const GAME_CATALOG: GameCatalogItem[] = [
   },
   {
     id: 'math-flight',
-    title: 'Math Flight',
+    title: '중간값 비행',
     description: '중간값을 찾아 운석을 피하는 게임',
   },
   {
