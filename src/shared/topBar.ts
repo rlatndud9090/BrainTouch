@@ -331,7 +331,7 @@ export class TopBar {
  * 게임별 TopBar 프리셋
  */
 export const TOP_BAR_PRESETS = {
-  // Brain Touch: 점수 | 하트 | 시간
+  // 몸풀기 터치: 점수 | 하트 | 시간
   brainTouch: {
     left: { type: 'score' as const, initialValue: 0 },
     center: { type: 'lives' as const, maxLives: 3 },
@@ -344,7 +344,7 @@ export const TOP_BAR_PRESETS = {
     right: { type: 'time' as const, initialValue: '0.00', color: BASE_COLORS.TEXT_SECONDARY },
   },
 
-  // Math Flight: 점수 | - | 하트
+  // 중간값 비행: 점수 | - | 하트
   mathFlight: {
     left: { type: 'score' as const, initialValue: 0 },
     right: { type: 'lives' as const, maxLives: 3 },

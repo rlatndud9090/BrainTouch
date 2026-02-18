@@ -25,7 +25,7 @@ export class ResultScene extends Phaser.Scene {
   private async shareResult(): Promise<void> {
     const outcome = await shareGameResult({
       gameId: 'brain-touch',
-      gameTitle: 'Brain Touch',
+      gameTitle: '몸풀기 터치',
       metricLabel: '점수',
       metricValue: this.resultData.score,
     });

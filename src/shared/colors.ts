@@ -9,7 +9,7 @@ export const BASE_COLORS = {
   BG_PRIMARY: 0x1a1a2e,
   BG_SECONDARY: 0x16213e,
   BG_DARK: 0x0a0a1a,
-  BG_SPACE: 0x0a0a1a, // Math Flight 우주 배경
+  BG_SPACE: 0x0a0a1a, // 중간값 비행 우주 배경
   BG_SKY: 0x87ceeb, // Number Balloon 하늘 배경
   BG_SKY_BOTTOM: 0xb0e0e6,
 
@@ -57,7 +57,7 @@ export const COLORFUL_PALETTE = [
 
 // 게임별 테마 색상 프리셋
 export const THEME_PRESETS = {
-  // Brain Touch - 핑크/레드 계열
+  // 몸풀기 터치 - 핑크/레드 계열
   brainTouch: {
     accent: 0xe94560,
     accentHover: 0xf25672,
@@ -72,7 +72,7 @@ export const THEME_PRESETS = {
     accentText: '#4ecca3',
   },
 
-  // Math Flight - 시안 계열
+  // 중간값 비행 - 시안 계열
   mathFlight: {
     accent: 0x00d4ff,
     accentHover: 0x33e0ff,
