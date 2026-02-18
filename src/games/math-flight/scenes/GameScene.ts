@@ -26,6 +26,9 @@ const LANE_POSITIONS = [0.2, 0.5, 0.8];
 // 운석 크기 margin (레인 너비 대비)
 const METEOR_MARGIN = 0.15; // 15% margin 양쪽
 
+const PLAYER_SCALE = 1.5;
+const PLAYER_EDGE_PADDING = 36;
+
 // 운석 스프라이트
 interface MeteorSprite {
   data: MeteorData;
@@ -189,6 +192,7 @@ export class GameScene extends Phaser.Scene {
     flame.fillTriangle(-8, 15, 8, 15, 0, 30);
 
     this.player.add([flame, ship]);
+    this.player.setScale(PLAYER_SCALE);
   }
 
   private setupInput(): void {
@@ -226,7 +230,7 @@ export class GameScene extends Phaser.Scene {
 
   private movePlayerToX(x: number): void {
     const { width } = this.scale;
-    const clampedX = Phaser.Math.Clamp(x, 30, width - 30);
+    const clampedX = Phaser.Math.Clamp(x, PLAYER_EDGE_PADDING, width - PLAYER_EDGE_PADDING);
     this.playerX = clampedX;
     this.player.x = clampedX;
   }
@@ -518,7 +522,7 @@ export class GameScene extends Phaser.Scene {
     this.topBar?.handleResize(width);
 
     if (this.player) {
-      this.playerX = Phaser.Math.Clamp(this.playerX, 30, width - 30);
+      this.playerX = Phaser.Math.Clamp(this.playerX, PLAYER_EDGE_PADDING, width - PLAYER_EDGE_PADDING);
       this.player.x = this.playerX;
       this.player.y = this.playerY;
     }
