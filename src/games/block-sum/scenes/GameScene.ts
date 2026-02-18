@@ -404,10 +404,6 @@ export class GameScene extends Phaser.Scene {
     this.difficultyLevels = upgradeResult.levels;
     this.difficultyUpgradeHistory = upgradeResult.history;
 
-    if (upgradeResult.upgradedAxis) {
-      this.showDifficultyUpgradeFeedback(upgradeResult.upgradedAxis);
-    }
-
     this.trackMaxDifficulty(
       getDifficultyScore(this.difficultyLevels),
       getDifficultyName(this.difficultyLevels)
@@ -417,10 +413,6 @@ export class GameScene extends Phaser.Scene {
   private applyDifficultyDowngradeOnFail(): void {
     const downgradeResult: DifficultyDowngradeResult = downgradeDifficultyOnFail(this.difficultyLevels);
     this.difficultyLevels = downgradeResult.levels;
-
-    if (downgradeResult.downgradedAxis) {
-      this.showDifficultyDowngradeFeedback(downgradeResult.downgradedAxis);
-    }
   }
 
   private recordRoundOutcome(outcome: 'success' | 'fail'): void {
@@ -441,69 +433,6 @@ export class GameScene extends Phaser.Scene {
     if (score >= this.maxDifficultyScore) {
       this.maxDifficultyScore = score;
       this.maxDifficultyName = name;
-    }
-  }
-
-  private showDifficultyUpgradeFeedback(axis: DifficultyAxis): void {
-    const { width, height } = this.scale;
-    const axisLabel = this.getAxisLabel(axis);
-
-    const text = this.add
-      .text(width / 2, height * 0.23, `난이도 상승: ${axisLabel}`, {
-        fontSize: '22px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#ffc947',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(250)
-      .setAlpha(0);
-
-    this.tweens.add({
-      targets: text,
-      alpha: 1,
-      y: text.y - 8,
-      duration: 180,
-      yoyo: true,
-      hold: 320,
-      onComplete: () => text.destroy(),
-    });
-  }
-
-  private showDifficultyDowngradeFeedback(axis: Exclude<DifficultyAxis, 'blockCount'>): void {
-    const { width, height } = this.scale;
-    const axisLabel = this.getAxisLabel(axis);
-
-    const text = this.add
-      .text(width / 2, height * 0.19, `난이도 완화: ${axisLabel}`, {
-        fontSize: '18px',
-        fontFamily: 'Pretendard, sans-serif',
-        color: '#4ecca3',
-      })
-      .setOrigin(0.5)
-      .setDepth(250)
-      .setAlpha(0);
-
-    this.tweens.add({
-      targets: text,
-      alpha: 1,
-      duration: 160,
-      yoyo: true,
-      hold: 400,
-      onComplete: () => text.destroy(),
-    });
-  }
-
-  private getAxisLabel(axis: DifficultyAxis): string {
-    switch (axis) {
-      case 'blockCount':
-        return '블록 수 +1';
-      case 'numberRange':
-        return '숫자 범위 확장';
-      case 'targetComplexity':
-        return '목표 복잡도 증가';
-      case 'timePressure':
-        return '시간 압박 증가';
     }
   }
 
