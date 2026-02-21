@@ -1,22 +1,27 @@
-﻿import type { RoundGenerationConfig } from './BlockGenerator';
+﻿import type { RoundGenerationConfig } from './BalloonGenerator';
 
-export type DifficultyAxis = 'blockCount' | 'numberRange' | 'targetComplexity';
+export type DifficultyAxis = 'balloonLoad' | 'mappingChaos' | 'numberCognition';
 
 export interface DifficultyAxisLevels {
-  blockCount: number;
-  numberRange: number;
-  targetComplexity: number;
+  balloonLoad: number;
+  mappingChaos: number;
+  numberCognition: number;
 }
 
-interface NumberRangeConfig {
-  minValue: number;
-  maxValue: number;
+interface BalloonLoadConfig {
+  balloonCount: number;
+  minSize: number;
+  maxSize: number;
 }
 
-interface TargetComplexityConfig {
-  maxRemove: number;
-  preferRemove: number;
-  maxTargetSum: number | null;
+interface MappingChaosConfig {
+  swapCount: number;
+  maxIndexDiff: number;
+}
+
+interface NumberCognitionConfig {
+  minNumber: number;
+  maxNumber: number;
 }
 
 export interface ResolvedRoundDifficulty {
@@ -37,85 +42,66 @@ export interface DifficultyUpgradeResult {
 
 export interface DifficultyDowngradeResult {
   levels: DifficultyAxisLevels;
-  downgradedAxis: Exclude<DifficultyAxis, 'blockCount'> | null;
+  downgradedAxis: DifficultyAxis | null;
 }
 
-export type RoundOutcome = 'success' | 'fail';
+export type DifficultyDowngradeReason = 'wrongTap' | 'timeout';
 
-export interface RoundTelemetryEntry {
-  round: number;
-  outcome: RoundOutcome;
-  elapsedMs: number;
-  timeLimitSec: number;
-  difficultyScore: number;
-}
-
-export interface RoundDifficultyStat {
-  round: number;
-  attempts: number;
-  successes: number;
-  fails: number;
-  failRate: number;
-  averageSuccessTimeSec: number | null;
-}
-
-export interface DifficultyMetricsSummary {
-  totalAttempts: number;
-  totalSuccesses: number;
-  totalFails: number;
-  overallFailRate: number;
-  roundStats: RoundDifficultyStat[];
-  failRateDeltaRound3To4: number | null;
-}
-
-const BLOCK_COUNT_LEVELS = [4, 5, 6] as const;
-
-const NUMBER_RANGE_LEVELS: readonly NumberRangeConfig[] = [
-  { minValue: 1, maxValue: 5 },
-  { minValue: 1, maxValue: 7 },
-  { minValue: 1, maxValue: 9 },
-  { minValue: 1, maxValue: 12 },
+const BALLOON_LOAD_LEVELS: readonly BalloonLoadConfig[] = [
+  { balloonCount: 5, minSize: 52, maxSize: 74 },
+  { balloonCount: 6, minSize: 50, maxSize: 72 },
+  { balloonCount: 7, minSize: 48, maxSize: 69 },
+  { balloonCount: 8, minSize: 46, maxSize: 66 },
+  { balloonCount: 9, minSize: 44, maxSize: 63 },
 ];
 
-const TARGET_COMPLEXITY_LEVELS: readonly TargetComplexityConfig[] = [
-  { maxRemove: 1, preferRemove: 1, maxTargetSum: 15 },
-  { maxRemove: 2, preferRemove: 1, maxTargetSum: 22 },
-  { maxRemove: 2, preferRemove: 2, maxTargetSum: 30 },
-  { maxRemove: 3, preferRemove: 2, maxTargetSum: null },
+const MAPPING_CHAOS_LEVELS: readonly MappingChaosConfig[] = [
+  { swapCount: 0, maxIndexDiff: 0 },
+  { swapCount: 1, maxIndexDiff: 2 },
+  { swapCount: 1, maxIndexDiff: 3 },
+  { swapCount: 2, maxIndexDiff: 4 },
+  { swapCount: 3, maxIndexDiff: 6 },
+  { swapCount: 4, maxIndexDiff: 8 },
+];
+
+const NUMBER_COGNITION_LEVELS: readonly NumberCognitionConfig[] = [
+  { minNumber: 0, maxNumber: 20 },
+  { minNumber: 0, maxNumber: 35 },
+  { minNumber: 5, maxNumber: 50 },
+  { minNumber: 10, maxNumber: 70 },
+  { minNumber: 20, maxNumber: 90 },
+  { minNumber: 30, maxNumber: 99 },
 ];
 
 const TIME_LIMIT_LEVELS = [10, 9, 8, 7, 6] as const;
 const TIME_LEVEL_INTERVAL_ROUNDS = 12;
 
 const AXIS_WEIGHTS: Record<DifficultyAxis, number> = {
-  blockCount: 0.4,
-  numberRange: 0.35,
-  targetComplexity: 0.25,
+  balloonLoad: 0.3,
+  mappingChaos: 0.45,
+  numberCognition: 0.25,
 };
 
 const MAX_LEVEL_BY_AXIS: Record<DifficultyAxis, number> = {
-  blockCount: BLOCK_COUNT_LEVELS.length - 1,
-  numberRange: NUMBER_RANGE_LEVELS.length - 1,
-  targetComplexity: TARGET_COMPLEXITY_LEVELS.length - 1,
+  balloonLoad: BALLOON_LOAD_LEVELS.length - 1,
+  mappingChaos: MAPPING_CHAOS_LEVELS.length - 1,
+  numberCognition: NUMBER_COGNITION_LEVELS.length - 1,
 };
 
-const MAX_UPGRADE_SCORE_DELTA = 0.2;
+const AXES: readonly DifficultyAxis[] = ['balloonLoad', 'mappingChaos', 'numberCognition'];
+const WRONG_TAP_DOWNGRADE_ORDER: readonly DifficultyAxis[] = ['mappingChaos', 'numberCognition', 'balloonLoad'];
+const TIMEOUT_DOWNGRADE_ORDER: readonly DifficultyAxis[] = ['balloonLoad', 'mappingChaos', 'numberCognition'];
+
+const MAX_UPGRADE_SCORE_DELTA = 0.22;
 const HISTORY_LIMIT = 12;
 
 export const ROUND_UPGRADE_INTERVAL = 4;
 
-const FAILURE_DOWNGRADE_AXES: readonly Exclude<DifficultyAxis, 'blockCount'>[] = [
-  'targetComplexity',
-  'numberRange',
-];
-
-const AXES: readonly DifficultyAxis[] = ['blockCount', 'numberRange', 'targetComplexity'];
-
 export function createInitialDifficultyLevels(): DifficultyAxisLevels {
   return {
-    blockCount: 0,
-    numberRange: 0,
-    targetComplexity: 0,
+    balloonLoad: 0,
+    mappingChaos: 0,
+    numberCognition: 0,
   };
 }
 
@@ -156,11 +142,6 @@ export function getDifficultyName(levels: DifficultyAxisLevels): string {
   return '쉬움';
 }
 
-export function getScoreMultiplier(difficultyScore: number): number {
-  const clamped = clamp(difficultyScore, 0, 1);
-  return roundTo(1 + clamped * 2, 2);
-}
-
 export function getTimeDifficultyLevel(round: number): number {
   const safeRound = Math.max(1, Math.floor(round));
   const level = Math.floor((safeRound - 1) / TIME_LEVEL_INTERVAL_ROUNDS);
@@ -171,10 +152,23 @@ export function resolveRoundDifficulty(
   round: number,
   levels: DifficultyAxisLevels
 ): ResolvedRoundDifficulty {
+  const load = BALLOON_LOAD_LEVELS[clamp(levels.balloonLoad, 0, MAX_LEVEL_BY_AXIS.balloonLoad)];
+  const chaos = MAPPING_CHAOS_LEVELS[clamp(levels.mappingChaos, 0, MAX_LEVEL_BY_AXIS.mappingChaos)];
+  const cognition =
+    NUMBER_COGNITION_LEVELS[clamp(levels.numberCognition, 0, MAX_LEVEL_BY_AXIS.numberCognition)];
+
   const timeDifficultyLevel = getTimeDifficultyLevel(round);
 
   return {
-    generationConfig: resolveGenerationConfig(levels),
+    generationConfig: {
+      balloonCount: load.balloonCount,
+      swapCount: chaos.swapCount,
+      maxIndexDiff: chaos.maxIndexDiff,
+      minNumber: cognition.minNumber,
+      maxNumber: cognition.maxNumber,
+      minSize: load.minSize,
+      maxSize: load.maxSize,
+    },
     timeLimit: TIME_LIMIT_LEVELS[timeDifficultyLevel],
     timeDifficultyLevel,
     difficultyScore: getDifficultyScore(levels),
@@ -182,8 +176,13 @@ export function resolveRoundDifficulty(
   };
 }
 
-export function downgradeDifficultyOnFail(levels: DifficultyAxisLevels): DifficultyDowngradeResult {
-  for (const axis of FAILURE_DOWNGRADE_AXES) {
+export function downgradeDifficultyOnFail(
+  levels: DifficultyAxisLevels,
+  reason: DifficultyDowngradeReason = 'wrongTap'
+): DifficultyDowngradeResult {
+  const order = reason === 'timeout' ? TIMEOUT_DOWNGRADE_ORDER : WRONG_TAP_DOWNGRADE_ORDER;
+
+  for (const axis of order) {
     if (levels[axis] > 0) {
       return {
         levels: {
@@ -251,91 +250,6 @@ export function upgradeDifficulty(
   };
 }
 
-export function summarizeDifficultyMetrics(entries: RoundTelemetryEntry[]): DifficultyMetricsSummary {
-  type RoundAccumulator = {
-    attempts: number;
-    successes: number;
-    fails: number;
-    successTimeMs: number;
-  };
-
-  const totals = {
-    attempts: entries.length,
-    successes: 0,
-    fails: 0,
-  };
-
-  const byRound = new Map<number, RoundAccumulator>();
-
-  for (const entry of entries) {
-    const aggregate = byRound.get(entry.round) ?? {
-      attempts: 0,
-      successes: 0,
-      fails: 0,
-      successTimeMs: 0,
-    };
-
-    aggregate.attempts += 1;
-    if (entry.outcome === 'success') {
-      aggregate.successes += 1;
-      aggregate.successTimeMs += entry.elapsedMs;
-      totals.successes += 1;
-    } else {
-      aggregate.fails += 1;
-      totals.fails += 1;
-    }
-
-    byRound.set(entry.round, aggregate);
-  }
-
-  const roundStats: RoundDifficultyStat[] = Array.from(byRound.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([round, aggregate]) => {
-      const failRate = aggregate.attempts > 0 ? aggregate.fails / aggregate.attempts : 0;
-      const averageSuccessTimeSec =
-        aggregate.successes > 0 ? roundTo(aggregate.successTimeMs / aggregate.successes / 1000, 2) : null;
-
-      return {
-        round,
-        attempts: aggregate.attempts,
-        successes: aggregate.successes,
-        fails: aggregate.fails,
-        failRate: roundTo(failRate, 3),
-        averageSuccessTimeSec,
-      };
-    });
-
-  const round3FailRate = roundStats.find((stat) => stat.round === 3)?.failRate;
-  const round4FailRate = roundStats.find((stat) => stat.round === 4)?.failRate;
-
-  return {
-    totalAttempts: totals.attempts,
-    totalSuccesses: totals.successes,
-    totalFails: totals.fails,
-    overallFailRate: totals.attempts > 0 ? roundTo(totals.fails / totals.attempts, 3) : 0,
-    roundStats,
-    failRateDeltaRound3To4:
-      round3FailRate !== undefined && round4FailRate !== undefined
-        ? roundTo(round4FailRate - round3FailRate, 3)
-        : null,
-  };
-}
-
-function resolveGenerationConfig(levels: DifficultyAxisLevels): RoundGenerationConfig {
-  const numberRange = NUMBER_RANGE_LEVELS[clamp(levels.numberRange, 0, MAX_LEVEL_BY_AXIS.numberRange)];
-  const targetComplexity =
-    TARGET_COMPLEXITY_LEVELS[clamp(levels.targetComplexity, 0, MAX_LEVEL_BY_AXIS.targetComplexity)];
-
-  return {
-    blockCount: BLOCK_COUNT_LEVELS[clamp(levels.blockCount, 0, MAX_LEVEL_BY_AXIS.blockCount)],
-    minValue: numberRange.minValue,
-    maxValue: numberRange.maxValue,
-    maxRemove: targetComplexity.maxRemove,
-    preferRemove: targetComplexity.preferRemove,
-    maxTargetSum: targetComplexity.maxTargetSum,
-  };
-}
-
 function wouldCreateTripleStreak(history: DifficultyAxis[], candidateAxis: DifficultyAxis): boolean {
   if (history.length < 2) {
     return false;
@@ -370,11 +284,7 @@ function pickWeightedAxis(
   return candidates[candidates.length - 1];
 }
 
-function getAxisWeight(
-  axis: DifficultyAxis,
-  levels: DifficultyAxisLevels,
-  history: DifficultyAxis[]
-): number {
+function getAxisWeight(axis: DifficultyAxis, levels: DifficultyAxisLevels, history: DifficultyAxis[]): number {
   const remainingSteps = MAX_LEVEL_BY_AXIS[axis] - levels[axis];
   const baseWeight = Math.max(1, remainingSteps + 1);
   const recentPenalty = history[history.length - 1] === axis ? 0.7 : 1;
