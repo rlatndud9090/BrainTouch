@@ -73,7 +73,7 @@ const NUMBER_COGNITION_LEVELS: readonly NumberCognitionConfig[] = [
   { minNumber: 30, maxNumber: 99 },
 ];
 
-const TIME_LIMIT_LEVELS = [10, 9, 8, 7, 6] as const;
+const TIME_LIMIT_LEVELS = [8, 7, 6, 5, 4] as const;
 const TIME_LEVEL_INTERVAL_ROUNDS = 12;
 
 const AXIS_WEIGHTS: Record<DifficultyAxis, number> = {
@@ -310,3 +310,4 @@ function roundTo(value: number, digits: number): number {
   const scale = 10 ** digits;
   return Math.round(value * scale) / scale;
 }
+

@@ -84,7 +84,7 @@ const TARGET_COMPLEXITY_LEVELS: readonly TargetComplexityConfig[] = [
   { maxRemove: 3, preferRemove: 2, maxTargetSum: null },
 ];
 
-const TIME_LIMIT_LEVELS = [10, 9, 8, 7, 6] as const;
+const TIME_LIMIT_LEVELS = [8, 7, 6, 5, 4] as const;
 const TIME_LEVEL_INTERVAL_ROUNDS = 12;
 
 const AXIS_WEIGHTS: Record<DifficultyAxis, number> = {
@@ -400,3 +400,4 @@ function roundTo(value: number, digits: number): number {
   const scale = 10 ** digits;
   return Math.round(value * scale) / scale;
 }
+

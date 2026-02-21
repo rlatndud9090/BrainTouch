@@ -32,6 +32,20 @@ const BALLOON_PHYSICS = {
   INITIAL_SPEED: 1.5,
 } as const;
 
+const TIMER_BAR = {
+  HEIGHT: 12,
+  TOP_OFFSET: 10,
+  SIDE_PADDING: 16,
+  MAX_WIDTH: 520,
+} as const;
+
+const TIMER_BAR_COLORS = {
+  NORMAL: 0x4ecca3,
+  WARNING: 0xffc947,
+  DANGER: 0xe94560,
+  BACKGROUND: 0x000000,
+} as const;
+
 interface BalloonBody {
   data: BalloonData;
   body: MatterJS.BodyType;
@@ -61,6 +75,10 @@ export class GameScene extends Phaser.Scene {
 
   private topBar!: TopBar;
   private instructionText!: Phaser.GameObjects.Text;
+  private timerBarBg!: Phaser.GameObjects.Rectangle;
+  private timerBarFill!: Phaser.GameObjects.Rectangle;
+  private timerBarWidth = 0;
+  private timerBarY = 0;
 
   private gameAreaWidth = 0;
   private gameAreaHeight = 0;
@@ -90,8 +108,7 @@ export class GameScene extends Phaser.Scene {
     this.calculateLayout(width, height);
     this.createBackground(width, height);
 
-    const firstRoundDifficulty = resolveRoundDifficulty(1, this.difficultyLevels);
-    this.createHUD(firstRoundDifficulty.timeLimit);
+    this.createHUD();
 
     this.instructionText = this.add
       .text(width / 2, this.gameAreaTop - 30, '작은 숫자부터 순서대로 터치!', {
@@ -129,7 +146,7 @@ export class GameScene extends Phaser.Scene {
 
   private calculateLayout(width: number, height: number): void {
     const hudHeight = TOP_BAR.HEIGHT;
-    const difficultyHeight = 25;
+    const difficultyHeight = 30;
     const instructionHeight = 40;
 
     this.gameAreaTop = hudHeight + difficultyHeight + instructionHeight;
@@ -177,14 +194,66 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private createHUD(initialTimeLimit: number): void {
+  private createHUD(): void {
     this.topBar = new TopBar(this, {
       left: { type: 'lives', maxLives: 3 },
-      center: { type: 'time', initialValue: initialTimeLimit, color: COLORS.TEXT_DARK },
       right: { type: 'score', initialValue: 0, color: COLORS.TEXT_DARK },
     });
 
     this.topBar.setAlpha(0);
+    this.createTimerBar(this.scale.width);
+    this.setTimerBarAlpha(0);
+  }
+
+  private createTimerBar(width: number): void {
+    this.timerBarWidth = Math.min(width - TIMER_BAR.SIDE_PADDING * 2, TIMER_BAR.MAX_WIDTH);
+    this.timerBarY = TOP_BAR.HEIGHT + TIMER_BAR.TOP_OFFSET;
+    const leftX = (width - this.timerBarWidth) / 2;
+
+    this.timerBarBg = this.add
+      .rectangle(width / 2, this.timerBarY, this.timerBarWidth, TIMER_BAR.HEIGHT, TIMER_BAR_COLORS.BACKGROUND, 0.25)
+      .setDepth(110);
+
+    this.timerBarFill = this.add
+      .rectangle(leftX, this.timerBarY, this.timerBarWidth, TIMER_BAR.HEIGHT, TIMER_BAR_COLORS.NORMAL, 0.95)
+      .setOrigin(0, 0.5)
+      .setDepth(111);
+  }
+
+  private setTimerBarAlpha(alpha: number): void {
+    this.timerBarBg?.setAlpha(alpha);
+    this.timerBarFill?.setAlpha(alpha);
+  }
+
+  private updateTimerBar(): void {
+    if (!this.timerBarFill) {
+      return;
+    }
+
+    const maxMs = this.roundTimeLimit * 1000;
+    const ratio = maxMs > 0 ? Phaser.Math.Clamp(this.roundTimeLeft / maxMs, 0, 1) : 0;
+    this.timerBarFill.displayWidth = this.timerBarWidth * ratio;
+
+    const color =
+      ratio <= 0.3
+        ? TIMER_BAR_COLORS.DANGER
+        : ratio <= 0.6
+          ? TIMER_BAR_COLORS.WARNING
+          : TIMER_BAR_COLORS.NORMAL;
+    this.timerBarFill.setFillStyle(color, 0.95);
+  }
+
+  private handleTimerBarResize(width: number): void {
+    this.timerBarWidth = Math.min(width - TIMER_BAR.SIDE_PADDING * 2, TIMER_BAR.MAX_WIDTH);
+    this.timerBarY = TOP_BAR.HEIGHT + TIMER_BAR.TOP_OFFSET;
+    const leftX = (width - this.timerBarWidth) / 2;
+
+    this.timerBarBg
+      ?.setPosition(width / 2, this.timerBarY)
+      .setSize(this.timerBarWidth, TIMER_BAR.HEIGHT);
+
+    this.timerBarFill?.setPosition(leftX, this.timerBarY);
+    this.updateTimerBar();
   }
 
   private prepareRound(): void {
@@ -207,8 +276,7 @@ export class GameScene extends Phaser.Scene {
 
     this.roundTimeLimit = roundDifficulty.timeLimit;
     this.roundTimeLeft = this.roundTimeLimit * 1000;
-    this.topBar.updateValue('center', this.roundTimeLimit);
-    this.topBar.setColor('center', COLORS.TIME_NORMAL);
+    this.updateTimerBar();
 
     this.startRoundTimer();
   }
@@ -460,6 +528,7 @@ export class GameScene extends Phaser.Scene {
 
     this.topBar.setAlpha(1);
     this.instructionText.setAlpha(1);
+    this.setTimerBarAlpha(1);
 
     this.prepareRound();
   }
@@ -483,13 +552,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.roundTimeLeft -= 100;
-
-    const seconds = Math.max(0, this.roundTimeLeft / 1000);
-    this.topBar.updateValue('center', parseFloat(seconds.toFixed(1)));
-
-    if (this.roundTimeLeft <= 3000) {
-      this.topBar.setColor('center', COLORS.TIME_WARNING);
-    }
+    this.updateTimerBar();
 
     if (this.roundTimeLeft <= 0) {
       this.handleTimeOut();
@@ -559,5 +622,7 @@ export class GameScene extends Phaser.Scene {
     this.setupWorldBounds(width, height);
 
     this.topBar?.handleResize(width);
+    this.handleTimerBarResize(width);
   }
 }
+

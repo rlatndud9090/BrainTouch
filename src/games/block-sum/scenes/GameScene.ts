@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+﻿import Phaser from 'phaser';
 import { BlockData, RoundData, generateRound, canAchieveTarget, calculateSum } from '../utils/BlockGenerator';
 import {
   DifficultyAxis,
@@ -17,7 +17,7 @@ import {
 } from '../utils/DifficultyDirector';
 import { BASE_COLORS, THEME_PRESETS, COLORFUL_PALETTE } from '../../../shared/colors';
 import { createGradientBackground, showStartScreen } from '../../../shared/ui';
-import { TopBar } from '../../../shared/topBar';
+import { TopBar, TOP_BAR } from '../../../shared/topBar';
 import { FONTS } from '../../../shared/constants';
 
 const COLORS = {
@@ -29,6 +29,20 @@ const COLORS = {
 };
 
 const BLOCK_COLORS = COLORFUL_PALETTE;
+
+const TIMER_BAR = {
+  HEIGHT: 12,
+  TOP_OFFSET: 10,
+  SIDE_PADDING: 16,
+  MAX_WIDTH: 520,
+} as const;
+
+const TIMER_BAR_COLORS = {
+  NORMAL: 0x4ecca3,
+  WARNING: 0xffc947,
+  DANGER: 0xe94560,
+  BACKGROUND: 0x000000,
+} as const;
 
 interface BlockSprite {
   data: BlockData;
@@ -46,7 +60,7 @@ export class GameScene extends Phaser.Scene {
   private difficultyUpgradeHistory: DifficultyAxis[] = [];
   private currentDifficultyScore = 0;
   private maxDifficultyScore = 0;
-  private maxDifficultyName = '하';
+  private maxDifficultyName = '쉬움';
 
   private roundTimeLimit = 0;
   private roundTimeLeft = 0;
@@ -63,6 +77,10 @@ export class GameScene extends Phaser.Scene {
   private targetLabel!: Phaser.GameObjects.Text;
   private targetText!: Phaser.GameObjects.Text;
   private blockContainer!: Phaser.GameObjects.Container;
+  private timerBarBg!: Phaser.GameObjects.Rectangle;
+  private timerBarFill!: Phaser.GameObjects.Rectangle;
+  private timerBarWidth = 0;
+  private timerBarY = 0;
 
   private selectedBlock: BlockSprite | null = null;
   private swipeStartX = 0;
@@ -104,8 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.calculateLayout(width, height);
     createGradientBackground(this, width, height);
 
-    const firstRoundDifficulty = resolveRoundDifficulty(1, this.difficultyLevels);
-    this.createHUD(firstRoundDifficulty.timeLimit);
+    this.createHUD();
     this.createTargetArea(width, height);
 
     this.blockContainer = this.add.container(width / 2, height * 0.5);
@@ -116,8 +133,8 @@ export class GameScene extends Phaser.Scene {
     this.setupGlobalSwipeDetection();
 
     showStartScreen(this, {
-      title: '🧱 블록을 스와이프로 제거하세요!',
-      subtitle: '남은 블록의 합이 목표 숫자가 되도록',
+      title: '블록을 스와이프로 제거하세요!',
+      subtitle: '남은 블록 합이 목표 숫자가 되면 성공',
       onStart: () => this.startGame(),
     });
 
@@ -172,21 +189,73 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private createHUD(initialTimeLimit: number): void {
+  private createHUD(): void {
     this.topBar = new TopBar(this, {
       left: { type: 'lives', maxLives: 3 },
-      center: { type: 'time', initialValue: initialTimeLimit, color: COLORS.ACCENT_TEXT },
       right: { type: 'score', initialValue: 0 },
     });
 
     this.topBar.setAlpha(0);
+    this.createTimerBar(this.scale.width);
+    this.setTimerBarAlpha(0);
+  }
+
+  private createTimerBar(width: number): void {
+    this.timerBarWidth = Math.min(width - TIMER_BAR.SIDE_PADDING * 2, TIMER_BAR.MAX_WIDTH);
+    this.timerBarY = TOP_BAR.HEIGHT + TIMER_BAR.TOP_OFFSET;
+    const leftX = (width - this.timerBarWidth) / 2;
+
+    this.timerBarBg = this.add
+      .rectangle(width / 2, this.timerBarY, this.timerBarWidth, TIMER_BAR.HEIGHT, TIMER_BAR_COLORS.BACKGROUND, 0.25)
+      .setDepth(110);
+
+    this.timerBarFill = this.add
+      .rectangle(leftX, this.timerBarY, this.timerBarWidth, TIMER_BAR.HEIGHT, TIMER_BAR_COLORS.NORMAL, 0.95)
+      .setOrigin(0, 0.5)
+      .setDepth(111);
+  }
+
+  private setTimerBarAlpha(alpha: number): void {
+    this.timerBarBg?.setAlpha(alpha);
+    this.timerBarFill?.setAlpha(alpha);
+  }
+
+  private updateTimerBar(): void {
+    if (!this.timerBarFill) {
+      return;
+    }
+
+    const maxMs = this.roundTimeLimit * 1000;
+    const ratio = maxMs > 0 ? Phaser.Math.Clamp(this.roundTimeLeft / maxMs, 0, 1) : 0;
+    this.timerBarFill.displayWidth = this.timerBarWidth * ratio;
+
+    const color =
+      ratio <= 0.3
+        ? TIMER_BAR_COLORS.DANGER
+        : ratio <= 0.6
+          ? TIMER_BAR_COLORS.WARNING
+          : TIMER_BAR_COLORS.NORMAL;
+    this.timerBarFill.setFillStyle(color, 0.95);
+  }
+
+  private handleTimerBarResize(width: number): void {
+    this.timerBarWidth = Math.min(width - TIMER_BAR.SIDE_PADDING * 2, TIMER_BAR.MAX_WIDTH);
+    this.timerBarY = TOP_BAR.HEIGHT + TIMER_BAR.TOP_OFFSET;
+    const leftX = (width - this.timerBarWidth) / 2;
+
+    this.timerBarBg
+      ?.setPosition(width / 2, this.timerBarY)
+      .setSize(this.timerBarWidth, TIMER_BAR.HEIGHT);
+
+    this.timerBarFill?.setPosition(leftX, this.timerBarY);
+    this.updateTimerBar();
   }
 
   private createTargetArea(width: number, height: number): void {
     const targetY = height * 0.15;
 
     this.targetLabel = this.add
-      .text(width / 2, targetY - 25, '목표', {
+      .text(width / 2, targetY - 25, '紐⑺몴', {
         fontSize: '18px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
@@ -221,8 +290,7 @@ export class GameScene extends Phaser.Scene {
 
     this.roundTimeLimit = roundDifficulty.timeLimit;
     this.roundTimeLeft = this.roundTimeLimit * 1000;
-    this.topBar.updateValue('center', this.roundTimeLimit);
-    this.topBar.setColor('center', COLORS.ACCENT_TEXT);
+    this.updateTimerBar();
 
     this.roundStartedAt = this.time.now;
     this.roundOutcomeRecorded = false;
@@ -441,7 +509,7 @@ export class GameScene extends Phaser.Scene {
     const targetY = this.targetText.y;
 
     const mark = this.add
-      .text(targetX, targetY, '○', {
+      .text(targetX, targetY, '정답!', {
         fontSize: '80px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#4ecca3',
@@ -467,7 +535,7 @@ export class GameScene extends Phaser.Scene {
     const thumbY = this.targetText.y;
 
     const thumb = this.add
-      .text(thumbX - 30, thumbY, '👍', {
+      .text(thumbX - 30, thumbY, 'GOOD', {
         fontSize: '36px',
       })
       .setOrigin(0, 0.5)
@@ -498,7 +566,7 @@ export class GameScene extends Phaser.Scene {
     const targetY = this.targetText.y;
 
     const mark = this.add
-      .text(targetX, targetY, '✕', {
+      .text(targetX, targetY, '오답!', {
         fontSize: '80px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#e94560',
@@ -534,6 +602,7 @@ export class GameScene extends Phaser.Scene {
     this.isPlaying = true;
 
     this.topBar.setAlpha(1);
+    this.setTimerBarAlpha(1);
     this.blockContainer.setAlpha(1);
     this.targetLabel.setAlpha(1);
     this.targetText.setAlpha(1);
@@ -556,13 +625,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.isPlaying) return;
 
     this.roundTimeLeft -= 100;
-
-    const seconds = Math.max(0, this.roundTimeLeft / 1000);
-    this.topBar.updateValue('center', parseFloat(seconds.toFixed(1)));
-
-    if (this.roundTimeLeft <= 3000) {
-      this.topBar.setColor('center', '#e94560');
-    }
+    this.updateTimerBar();
 
     if (this.roundTimeLeft <= 0) {
       this.roundTimerEvent?.destroy();
@@ -587,5 +650,7 @@ export class GameScene extends Phaser.Scene {
     const { width } = gameSize;
     this.calculateLayout(width, gameSize.height);
     this.topBar?.handleResize(width);
+    this.handleTimerBarResize(width);
   }
 }
+
