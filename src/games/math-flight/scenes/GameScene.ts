@@ -1,9 +1,5 @@
 import Phaser from 'phaser';
-import {
-  MeteorData,
-  generateMeteors,
-  isSuccessMeteor,
-} from '../utils/MeteorGenerator';
+import { MeteorData, generateMeteors, isSuccessMeteor } from '../utils/MeteorGenerator';
 import {
   DifficultyAxis,
   DifficultyAxisLevels,
@@ -31,7 +27,10 @@ const METEOR_CORE_DISPLAY_FACTOR = 3.0;
 const METEOR_SPLIT_DISPLAY_FACTOR = 3.1;
 const METEOR_FLAME_WRAP_WIDTH_FACTOR = 5.5;
 const METEOR_FLAME_WRAP_HEIGHT_FACTOR = 3.52;
+const METEOR_FLAME_VERTICAL_OFFSET_FACTOR = 0.5;
 const MEDIAN_HIT_DURATION_MS = 500;
+const METEOR_LABEL_SHADOW_COLOR = 'rgba(0, 0, 0, 0.45)';
+const MAX_TEXT_RESOLUTION = 3;
 
 const DEPTH_METEOR = 120;
 const DEPTH_PLAYER = 180;
@@ -48,9 +47,18 @@ const TEXTURE_KEYS = {
 const TEXTURE_URLS = {
   ship: new URL('../../../assets/sprites/math-flight/ship_player.png', import.meta.url).href,
   meteorCore: new URL('../../../assets/sprites/math-flight/meteor_core.png', import.meta.url).href,
-  meteorSplitHit: new URL('../../../assets/sprites/math-flight/meteor_split_hit.png', import.meta.url).href,
-  meteorTrail1: new URL('../../../assets/sprites/math-flight/meteor_trail_flame1.png', import.meta.url).href,
-  meteorTrail2: new URL('../../../assets/sprites/math-flight/meteor_trail_flame2.png', import.meta.url).href,
+  meteorSplitHit: new URL(
+    '../../../assets/sprites/math-flight/meteor_split_hit.png',
+    import.meta.url,
+  ).href,
+  meteorTrail1: new URL(
+    '../../../assets/sprites/math-flight/meteor_trail_flame1.png',
+    import.meta.url,
+  ).href,
+  meteorTrail2: new URL(
+    '../../../assets/sprites/math-flight/meteor_trail_flame2.png',
+    import.meta.url,
+  ).href,
 } as const;
 
 const TRAIL_TEXTURE_ORDER = [TEXTURE_KEYS.meteorTrail1, TEXTURE_KEYS.meteorTrail2] as const;
@@ -154,18 +162,23 @@ export class GameScene extends Phaser.Scene {
     this.scale.on('resize', this.handleResize, this);
   }
 
+  private getTextResolution(): number {
+    const dpr = typeof window === 'undefined' ? 2 : window.devicePixelRatio || 1;
+    return Math.max(2, Math.min(dpr, MAX_TEXT_RESOLUTION));
+  }
+
   private calculateLayout(width: number, height: number): void {
-    this.laneXPositions = LANE_POSITIONS.map((ratio) => width * ratio);
+    this.laneXPositions = LANE_POSITIONS.map((ratio) => Math.round(width * ratio));
 
     // 레인 너비 계산 (인접 레인 간 거리)
     this.laneWidth = width * (LANE_POSITIONS[1] - LANE_POSITIONS[0]);
 
     // 운석 반지름: 레인 너비의 절반에서 margin 제외
-    this.meteorRadius = (this.laneWidth / 2) * (1 - METEOR_MARGIN);
+    this.meteorRadius = Math.round((this.laneWidth / 2) * (1 - METEOR_MARGIN));
     this.playerSize = Math.max(72, Math.round(this.meteorRadius * PLAYER_SIZE_FACTOR));
     this.playerEdgePadding = Math.max(30, Math.round(this.playerSize * 0.45));
 
-    this.playerY = height * 0.85;
+    this.playerY = Math.round(height * 0.85);
     this.collisionLineY = this.playerY; // 판정 라인 = 플레이어 Y
     this.meteorStartY = -this.meteorRadius - 10;
     this.baseSpeed = height / 3000; // 3초에 화면 통과 (기본)
@@ -176,7 +189,7 @@ export class GameScene extends Phaser.Scene {
     // lives는 LivesManager에서 관리
     this.turnCount = 0;
     this.successfulHits = 0;
-    this.playerX = this.scale.width / 2;
+    this.playerX = Math.round(this.scale.width / 2);
     this.isPlaying = false;
     this.isPointerDown = false;
     this.hasCollidedThisWave = false;
@@ -204,7 +217,7 @@ export class GameScene extends Phaser.Scene {
     graphics.lineStyle(1, BASE_COLORS.LANE_LINE, 0.3);
 
     for (let i = 1; i < LANE_POSITIONS.length; i++) {
-      const x = width * ((LANE_POSITIONS[i - 1] + LANE_POSITIONS[i]) / 2);
+      const x = Math.round(width * ((LANE_POSITIONS[i - 1] + LANE_POSITIONS[i]) / 2));
       graphics.lineBetween(x, 60, x, height - 50);
     }
   }
@@ -268,8 +281,8 @@ export class GameScene extends Phaser.Scene {
   private movePlayerToX(x: number): void {
     const { width } = this.scale;
     const clampedX = Phaser.Math.Clamp(x, this.playerEdgePadding, width - this.playerEdgePadding);
-    this.playerX = clampedX;
-    this.player.x = clampedX;
+    this.playerX = Math.round(clampedX);
+    this.player.x = this.playerX;
   }
 
   private startGame(): void {
@@ -307,30 +320,44 @@ export class GameScene extends Phaser.Scene {
   private createMeteorSprite(data: MeteorData): MeteorSprite {
     const x = this.laneXPositions[data.lane];
     const y = this.meteorStartY;
+    const trailOffsetY = -Math.round(this.meteorRadius * METEOR_FLAME_VERTICAL_OFFSET_FACTOR);
+    const trailWidth = Math.round(this.meteorRadius * METEOR_FLAME_WRAP_WIDTH_FACTOR);
+    const trailHeight = Math.round(this.meteorRadius * METEOR_FLAME_WRAP_HEIGHT_FACTOR);
+    const coreSize = Math.round(this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR);
 
     const container = this.add.container(x, y);
     container.setDepth(DEPTH_METEOR);
 
     const trail = this.add
-      .image(0, -this.meteorRadius * 0.22, TRAIL_TEXTURE_ORDER[0])
-      .setDisplaySize(this.meteorRadius * METEOR_FLAME_WRAP_WIDTH_FACTOR, this.meteorRadius * METEOR_FLAME_WRAP_HEIGHT_FACTOR)
+      .image(0, trailOffsetY, TRAIL_TEXTURE_ORDER[0])
+      .setDisplaySize(trailWidth, trailHeight)
       .setAlpha(0.9)
       .setBlendMode(Phaser.BlendModes.ADD);
 
-    const core = this.add
-      .image(0, 0, TEXTURE_KEYS.meteorCore)
-      .setDisplaySize(this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR, this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR);
+    const core = this.add.image(0, 0, TEXTURE_KEYS.meteorCore).setDisplaySize(coreSize, coreSize);
 
     // 숫자 텍스트 (Cherry Bomb One 폰트)
     const fontSize = Math.max(18, Math.floor(this.meteorRadius * 0.75));
+    const strokeThickness = Math.max(3, Math.round(fontSize * 0.11));
     const label = this.add
       .text(0, 0, data.value.toString(), {
         fontSize: `${fontSize}px`,
         fontFamily: FONTS.NUMBER,
         color: '#ffffff',
+        stroke: '#14314f',
+        strokeThickness,
       })
       .setOrigin(0.5)
-      .setResolution(2); // 고해상도 렌더링으로 블러 방지
+      .setResolution(this.getTextResolution());
+
+    label.setShadow(
+      0,
+      2,
+      METEOR_LABEL_SHADOW_COLOR,
+      Math.max(2, Math.round(fontSize * 0.08)),
+      false,
+      true,
+    );
 
     container.add([trail, core, label]);
 
@@ -509,7 +536,8 @@ export class GameScene extends Phaser.Scene {
     meteor.trail.destroy();
     meteor.label.setVisible(false);
     meteor.core.setTexture(TEXTURE_KEYS.meteorSplitHit);
-    meteor.core.setDisplaySize(this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR, this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR);
+    const splitSize = Math.round(this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR);
+    meteor.core.setDisplaySize(splitSize, splitSize);
 
     this.time.delayedCall(MEDIAN_HIT_DURATION_MS, () => {
       meteor.container.destroy();
@@ -531,7 +559,10 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     // 화면 빨간색 플래시
-    const flash = this.add.rectangle(0, 0, width, height, THEME.failFlash, 0.3).setOrigin(0, 0).setDepth(DEPTH_EFFECT);
+    const flash = this.add
+      .rectangle(0, 0, width, height, THEME.failFlash, 0.3)
+      .setOrigin(0, 0)
+      .setDepth(DEPTH_EFFECT);
 
     this.tweens.add({
       targets: flash,
@@ -593,7 +624,9 @@ export class GameScene extends Phaser.Scene {
     this.topBar?.handleResize(width);
 
     if (this.player) {
-      this.playerX = Phaser.Math.Clamp(this.playerX, this.playerEdgePadding, width - this.playerEdgePadding);
+      this.playerX = Math.round(
+        Phaser.Math.Clamp(this.playerX, this.playerEdgePadding, width - this.playerEdgePadding),
+      );
       this.player.x = this.playerX;
       this.player.y = this.playerY;
       this.playerBody?.setDisplaySize(this.playerSize, this.playerSize);

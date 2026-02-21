@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
-import { waitForFonts } from '../shared/constants';
+import { createHighResScale, waitForFonts } from '../shared/constants';
 
 interface PhaserGameProps {
   gameId: string;
@@ -46,7 +46,9 @@ export default function PhaserGame({ gameId, onGameOver }: PhaserGameProps) {
     const handleResize = () => {
       if (gameRef.current && containerRef.current) {
         const { clientWidth, clientHeight } = containerRef.current;
-        gameRef.current.scale.resize(clientWidth, clientHeight);
+        const scale = createHighResScale(clientWidth, clientHeight);
+        gameRef.current.scale.resize(scale.width, scale.height);
+        gameRef.current.scale.setZoom(scale.zoom);
       }
     };
 
