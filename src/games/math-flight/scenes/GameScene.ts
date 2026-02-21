@@ -1,31 +1,70 @@
 import Phaser from 'phaser';
 import {
   MeteorData,
-  Difficulty,
   generateMeteors,
-  getDifficulty,
-  getSpeedMultiplier,
   isSuccessMeteor,
-  isMedianMeteor,
 } from '../utils/MeteorGenerator';
+import {
+  DifficultyAxis,
+  DifficultyAxisLevels,
+  ROUND_UPGRADE_INTERVAL,
+  createInitialDifficultyLevels,
+  downgradeDifficultyOnFail,
+  resolveRoundDifficulty,
+  upgradeDifficulty,
+} from '../utils/DifficultyDirector';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
 import { showStartScreen } from '../../../shared/ui';
-import { TopBar, TOP_BAR } from '../../../shared/topBar';
+import { TopBar } from '../../../shared/topBar';
 import { FONTS } from '../../../shared/constants';
 
 const THEME = THEME_PRESETS.mathFlight;
 
 // 레인 X 좌표 비율
-const LANE_POSITIONS = [0.1, 0.3, 0.5, 0.7, 0.9];
+const LANE_POSITIONS = [0.2, 0.5, 0.8];
 
 // 운석 크기 margin (레인 너비 대비)
 const METEOR_MARGIN = 0.15; // 15% margin 양쪽
+const TRAIL_SWAP_INTERVAL_MS = 125; // 1초에 8회
+const PLAYER_SIZE_FACTOR = 1.485;
+const METEOR_CORE_DISPLAY_FACTOR = 3.0;
+const METEOR_SPLIT_DISPLAY_FACTOR = 3.1;
+const METEOR_FLAME_WRAP_WIDTH_FACTOR = 5.5;
+const METEOR_FLAME_WRAP_HEIGHT_FACTOR = 3.52;
+const MEDIAN_HIT_DURATION_MS = 500;
+
+const DEPTH_METEOR = 120;
+const DEPTH_PLAYER = 180;
+const DEPTH_EFFECT = 220;
+
+const TEXTURE_KEYS = {
+  ship: 'math-flight-ship-player',
+  meteorCore: 'math-flight-meteor-core',
+  meteorSplitHit: 'math-flight-meteor-split-hit',
+  meteorTrail1: 'math-flight-meteor-trail-1',
+  meteorTrail2: 'math-flight-meteor-trail-2',
+} as const;
+
+const TEXTURE_URLS = {
+  ship: new URL('../../../assets/sprites/math-flight/ship_player.png', import.meta.url).href,
+  meteorCore: new URL('../../../assets/sprites/math-flight/meteor_core.png', import.meta.url).href,
+  meteorSplitHit: new URL('../../../assets/sprites/math-flight/meteor_split_hit.png', import.meta.url).href,
+  meteorTrail1: new URL('../../../assets/sprites/math-flight/meteor_trail_flame1.png', import.meta.url).href,
+  meteorTrail2: new URL('../../../assets/sprites/math-flight/meteor_trail_flame2.png', import.meta.url).href,
+} as const;
+
+const TRAIL_TEXTURE_ORDER = [TEXTURE_KEYS.meteorTrail1, TEXTURE_KEYS.meteorTrail2] as const;
 
 // 운석 스프라이트
 interface MeteorSprite {
   data: MeteorData;
   container: Phaser.GameObjects.Container;
+  core: Phaser.GameObjects.Image;
+  label: Phaser.GameObjects.Text;
+  trail: Phaser.GameObjects.Image;
   y: number;
+  trailFrameIndex: number;
+  trailElapsedMs: number;
   processed: boolean; // 판정 완료 여부
 }
 
@@ -33,16 +72,20 @@ export class GameScene extends Phaser.Scene {
   // 게임 상태
   private score = 0;
   private turnCount = 0;
+  private successfulHits = 0;
   private playerX = 0;
   private startTime = 0;
   private isPlaying = false;
   private hasCollidedThisWave = false;
-  private currentDifficulty: Difficulty = 'easy';
   private isPointerDown = false; // 드래그 상태 추적
+  private difficultyLevels: DifficultyAxisLevels = createInitialDifficultyLevels();
+  private difficultyUpgradeHistory: DifficultyAxis[] = [];
+  private currentSpeedMultiplier = 1;
 
   // UI 요소
   private topBar!: TopBar;
   private player!: Phaser.GameObjects.Container;
+  private playerBody!: Phaser.GameObjects.Image;
 
   // 운석
   private meteors: MeteorSprite[] = [];
@@ -52,12 +95,28 @@ export class GameScene extends Phaser.Scene {
   private laneXPositions: number[] = [];
   private laneWidth = 0; // 레인 너비
   private meteorRadius = 0; // 운석 반지름
+  private playerSize = 0;
+  private playerEdgePadding = 30;
   private playerY = 0;
   private meteorStartY = 0;
   private collisionLineY = 0; // 판정 라인 Y 좌표
 
   constructor() {
     super({ key: 'GameScene' });
+  }
+
+  preload(): void {
+    this.loadTextureIfMissing(TEXTURE_KEYS.ship, TEXTURE_URLS.ship);
+    this.loadTextureIfMissing(TEXTURE_KEYS.meteorCore, TEXTURE_URLS.meteorCore);
+    this.loadTextureIfMissing(TEXTURE_KEYS.meteorSplitHit, TEXTURE_URLS.meteorSplitHit);
+    this.loadTextureIfMissing(TEXTURE_KEYS.meteorTrail1, TEXTURE_URLS.meteorTrail1);
+    this.loadTextureIfMissing(TEXTURE_KEYS.meteorTrail2, TEXTURE_URLS.meteorTrail2);
+  }
+
+  private loadTextureIfMissing(key: string, url: string): void {
+    if (!this.textures.exists(key)) {
+      this.load.image(key, url);
+    }
   }
 
   create(): void {
@@ -87,7 +146,7 @@ export class GameScene extends Phaser.Scene {
     // 시작 화면 표시
     showStartScreen(this, {
       title: '🚀 중간값 운석을 맞추세요!',
-      subtitle: '5개 중 가장 큰/작은 수를 피하고\n중간 3개를 맞추면 성공',
+      subtitle: '3개 중 정확히 중간값만 맞추면 성공',
       onStart: () => this.startGame(),
     });
 
@@ -103,6 +162,8 @@ export class GameScene extends Phaser.Scene {
 
     // 운석 반지름: 레인 너비의 절반에서 margin 제외
     this.meteorRadius = (this.laneWidth / 2) * (1 - METEOR_MARGIN);
+    this.playerSize = Math.max(72, Math.round(this.meteorRadius * PLAYER_SIZE_FACTOR));
+    this.playerEdgePadding = Math.max(30, Math.round(this.playerSize * 0.45));
 
     this.playerY = height * 0.85;
     this.collisionLineY = this.playerY; // 판정 라인 = 플레이어 Y
@@ -114,12 +175,15 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     // lives는 LivesManager에서 관리
     this.turnCount = 0;
+    this.successfulHits = 0;
     this.playerX = this.scale.width / 2;
-    this.currentDifficulty = 'easy';
     this.isPlaying = false;
     this.isPointerDown = false;
     this.hasCollidedThisWave = false;
     this.meteors = [];
+    this.difficultyLevels = createInitialDifficultyLevels();
+    this.difficultyUpgradeHistory = [];
+    this.currentSpeedMultiplier = 1;
   }
 
   private createBackground(width: number, height: number): void {
@@ -139,7 +203,7 @@ export class GameScene extends Phaser.Scene {
     const graphics = this.add.graphics();
     graphics.lineStyle(1, BASE_COLORS.LANE_LINE, 0.3);
 
-    for (let i = 1; i < 5; i++) {
+    for (let i = 1; i < LANE_POSITIONS.length; i++) {
       const x = width * ((LANE_POSITIONS[i - 1] + LANE_POSITIONS[i]) / 2);
       graphics.lineBetween(x, 60, x, height - 50);
     }
@@ -161,23 +225,11 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayer(): void {
     this.player = this.add.container(this.playerX, this.playerY);
-
-    // 플레이어 모양 (삼각형 우주선)
-    const ship = this.add.graphics();
-    ship.fillStyle(THEME.player, 1);
-    ship.beginPath();
-    ship.moveTo(0, -20);
-    ship.lineTo(-15, 15);
-    ship.lineTo(15, 15);
-    ship.closePath();
-    ship.fill();
-
-    // 엔진 불꽃
-    const flame = this.add.graphics();
-    flame.fillStyle(0xff6b35, 1);
-    flame.fillTriangle(-8, 15, 8, 15, 0, 30);
-
-    this.player.add([flame, ship]);
+    this.playerBody = this.add
+      .image(0, 0, TEXTURE_KEYS.ship)
+      .setDisplaySize(this.playerSize, this.playerSize);
+    this.player.add(this.playerBody);
+    this.player.setDepth(DEPTH_PLAYER);
   }
 
   private setupInput(): void {
@@ -215,7 +267,7 @@ export class GameScene extends Phaser.Scene {
 
   private movePlayerToX(x: number): void {
     const { width } = this.scale;
-    const clampedX = Phaser.Math.Clamp(x, 30, width - 30);
+    const clampedX = Phaser.Math.Clamp(x, this.playerEdgePadding, width - this.playerEdgePadding);
     this.playerX = clampedX;
     this.player.x = clampedX;
   }
@@ -236,11 +288,12 @@ export class GameScene extends Phaser.Scene {
     // 충돌 플래그 리셋
     this.hasCollidedThisWave = false;
 
-    // 난이도 업데이트
-    this.currentDifficulty = getDifficulty(this.turnCount);
+    const round = this.turnCount + 1;
+    const roundDifficulty = resolveRoundDifficulty(round, this.difficultyLevels);
+    this.currentSpeedMultiplier = roundDifficulty.speedMultiplier;
 
     // 운석 생성
-    const meteorData = generateMeteors(this.currentDifficulty);
+    const meteorData = generateMeteors(roundDifficulty.generationConfig);
 
     // 운석 스프라이트 생성
     meteorData.forEach((data) => {
@@ -256,13 +309,21 @@ export class GameScene extends Phaser.Scene {
     const y = this.meteorStartY;
 
     const container = this.add.container(x, y);
+    container.setDepth(DEPTH_METEOR);
 
-    // 운석 배경 (레인 너비에 맞춘 크기)
-    const bg = this.add.circle(0, 0, this.meteorRadius, THEME.meteorNormal);
+    const trail = this.add
+      .image(0, -this.meteorRadius * 0.22, TRAIL_TEXTURE_ORDER[0])
+      .setDisplaySize(this.meteorRadius * METEOR_FLAME_WRAP_WIDTH_FACTOR, this.meteorRadius * METEOR_FLAME_WRAP_HEIGHT_FACTOR)
+      .setAlpha(0.9)
+      .setBlendMode(Phaser.BlendModes.ADD);
+
+    const core = this.add
+      .image(0, 0, TEXTURE_KEYS.meteorCore)
+      .setDisplaySize(this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR, this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR);
 
     // 숫자 텍스트 (Cherry Bomb One 폰트)
     const fontSize = Math.max(18, Math.floor(this.meteorRadius * 0.75));
-    const text = this.add
+    const label = this.add
       .text(0, 0, data.value.toString(), {
         fontSize: `${fontSize}px`,
         fontFamily: FONTS.NUMBER,
@@ -271,12 +332,17 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setResolution(2); // 고해상도 렌더링으로 블러 방지
 
-    container.add([bg, text]);
+    container.add([trail, core, label]);
 
     return {
       data,
       container,
+      core,
+      label,
+      trail,
       y,
+      trailFrameIndex: 0,
+      trailElapsedMs: 0,
       processed: false, // 아직 판정 안됨
     };
   }
@@ -296,10 +362,11 @@ export class GameScene extends Phaser.Scene {
 
   private updateMeteors(delta: number): void {
     const { height } = this.scale;
-    const speedMultiplier = getSpeedMultiplier(this.currentDifficulty);
-    const currentSpeed = this.baseSpeed * speedMultiplier;
+    const currentSpeed = this.baseSpeed * this.currentSpeedMultiplier;
 
     this.meteors.forEach((meteor) => {
+      this.updateMeteorTrail(meteor, delta);
+
       meteor.y += currentSpeed * delta;
       // 정수 좌표로 렌더링하여 블러 방지
       meteor.container.y = Math.round(meteor.y);
@@ -312,6 +379,21 @@ export class GameScene extends Phaser.Scene {
 
     // 화면 밖 운석 필터링
     this.meteors = this.meteors.filter((m) => m.y <= this.scale.height + 50);
+  }
+
+  private updateMeteorTrail(meteor: MeteorSprite, delta: number): void {
+    meteor.trailElapsedMs += delta;
+    if (meteor.trailElapsedMs < TRAIL_SWAP_INTERVAL_MS) {
+      return;
+    }
+
+    const steps = Math.floor(meteor.trailElapsedMs / TRAIL_SWAP_INTERVAL_MS);
+    meteor.trailElapsedMs -= steps * TRAIL_SWAP_INTERVAL_MS;
+
+    if (steps % 2 === 1) {
+      meteor.trailFrameIndex = meteor.trailFrameIndex === 0 ? 1 : 0;
+      meteor.trail.setTexture(TRAIL_TEXTURE_ORDER[meteor.trailFrameIndex]);
+    }
   }
 
   private checkCollisions(): void {
@@ -339,8 +421,10 @@ export class GameScene extends Phaser.Scene {
         if (meteor.data.lane === playerLane) {
           this.hasCollidedThisWave = true;
           meteor.processed = true;
-          this.handleCollision(meteor);
-          meteor.container.destroy();
+          const shouldDestroyImmediately = this.handleCollision(meteor);
+          if (shouldDestroyImmediately) {
+            meteor.container.destroy();
+          }
           this.meteors.splice(i, 1);
           break;
         }
@@ -369,44 +453,47 @@ export class GameScene extends Phaser.Scene {
     return closestLane;
   }
 
-  private handleCollision(meteor: MeteorSprite): void {
+  private handleCollision(meteor: MeteorSprite): boolean {
     const { type } = meteor.data;
 
     if (isSuccessMeteor(type)) {
-      // 성공!
-      const baseScore = 100;
-      const multiplier = isMedianMeteor(type) ? 2 : 1;
-      const earnedScore = baseScore * multiplier;
-
+      const earnedScore = 200;
       this.score += earnedScore;
-      this.showSuccessEffect(meteor, earnedScore, isMedianMeteor(type));
+      this.successfulHits++;
+      this.showSuccessScorePopup(meteor, earnedScore);
+      this.playMedianHitSprite(meteor);
+
+      if (this.successfulHits > 0 && this.successfulHits % ROUND_UPGRADE_INTERVAL === 0) {
+        this.applyDifficultyUpgrade();
+      }
+
+      this.topBar.updateValue('right', this.score);
+      return false;
     } else {
-      // 실패 (min 또는 max)
+      this.applyDifficultyDowngradeOnFail();
       const isGameOver = this.topBar.loseLife('left');
       this.showFailEffect();
 
       if (isGameOver) {
         this.endGame();
-        return;
+        return true;
       }
     }
 
     this.topBar.updateValue('right', this.score);
+    return true;
   }
 
-  private showSuccessEffect(meteor: MeteorSprite, score: number, isMedian: boolean): void {
-    const color = isMedian ? THEME.medianFlash : THEME.successFlash;
-    const text = isMedian ? `+${score} x2!` : `+${score}`;
-
-    // 점수 팝업
+  private showSuccessScorePopup(meteor: MeteorSprite, score: number): void {
     const popup = this.add
-      .text(meteor.container.x, meteor.container.y, text, {
+      .text(meteor.container.x, meteor.container.y, `+${score}`, {
         fontSize: '24px',
         fontFamily: 'Pretendard, sans-serif',
-        color: isMedian ? '#ffc947' : '#4ecca3',
+        color: '#ffc947',
         fontStyle: 'bold',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(DEPTH_EFFECT + 10);
 
     this.tweens.add({
       targets: popup,
@@ -416,24 +503,35 @@ export class GameScene extends Phaser.Scene {
       ease: 'Power2',
       onComplete: () => popup.destroy(),
     });
+  }
 
-    // 플래시 효과
-    const { width, height } = this.scale;
-    const flash = this.add.rectangle(0, 0, width, height, color, 0.2).setOrigin(0, 0);
+  private playMedianHitSprite(meteor: MeteorSprite): void {
+    meteor.trail.destroy();
+    meteor.label.setVisible(false);
+    meteor.core.setTexture(TEXTURE_KEYS.meteorSplitHit);
+    meteor.core.setDisplaySize(this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR, this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR);
 
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      duration: 200,
-      onComplete: () => flash.destroy(),
+    this.time.delayedCall(MEDIAN_HIT_DURATION_MS, () => {
+      meteor.container.destroy();
     });
+  }
+
+  private applyDifficultyUpgrade(): void {
+    const upgradeResult = upgradeDifficulty(this.difficultyLevels, this.difficultyUpgradeHistory);
+    this.difficultyLevels = upgradeResult.levels;
+    this.difficultyUpgradeHistory = upgradeResult.history;
+  }
+
+  private applyDifficultyDowngradeOnFail(): void {
+    const downgradeResult = downgradeDifficultyOnFail(this.difficultyLevels);
+    this.difficultyLevels = downgradeResult.levels;
   }
 
   private showFailEffect(): void {
     const { width, height } = this.scale;
 
     // 화면 빨간색 플래시
-    const flash = this.add.rectangle(0, 0, width, height, THEME.failFlash, 0.3).setOrigin(0, 0);
+    const flash = this.add.rectangle(0, 0, width, height, THEME.failFlash, 0.3).setOrigin(0, 0).setDepth(DEPTH_EFFECT);
 
     this.tweens.add({
       targets: flash,
@@ -495,9 +593,10 @@ export class GameScene extends Phaser.Scene {
     this.topBar?.handleResize(width);
 
     if (this.player) {
-      this.playerX = Phaser.Math.Clamp(this.playerX, 30, width - 30);
+      this.playerX = Phaser.Math.Clamp(this.playerX, this.playerEdgePadding, width - this.playerEdgePadding);
       this.player.x = this.playerX;
       this.player.y = this.playerY;
+      this.playerBody?.setDisplaySize(this.playerSize, this.playerSize);
     }
   }
 }
