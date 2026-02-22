@@ -84,8 +84,8 @@ const TARGET_COMPLEXITY_LEVELS: readonly TargetComplexityConfig[] = [
   { maxRemove: 3, preferRemove: 2, maxTargetSum: null },
 ];
 
-const TIME_LIMIT_LEVELS = [8, 7, 6, 5, 4] as const;
-const TIME_LEVEL_INTERVAL_ROUNDS = 12;
+const TIME_LIMIT_LEVELS = [6, 5, 4] as const;
+const COUNT_TIME_LEVEL_INTERVAL_ROUNDS = 12;
 
 const AXIS_WEIGHTS: Record<DifficultyAxis, number> = {
   blockCount: 0.4,
@@ -102,7 +102,7 @@ const MAX_LEVEL_BY_AXIS: Record<DifficultyAxis, number> = {
 const MAX_UPGRADE_SCORE_DELTA = 0.2;
 const HISTORY_LIMIT = 12;
 
-export const ROUND_UPGRADE_INTERVAL = 4;
+export const ROUND_UPGRADE_INTERVAL = 12;
 
 const FAILURE_DOWNGRADE_AXES: readonly Exclude<DifficultyAxis, 'blockCount'>[] = [
   'targetComplexity',
@@ -110,6 +110,10 @@ const FAILURE_DOWNGRADE_AXES: readonly Exclude<DifficultyAxis, 'blockCount'>[] =
 ];
 
 const AXES: readonly DifficultyAxis[] = ['blockCount', 'numberRange', 'targetComplexity'];
+const RANDOM_UPGRADE_AXES: readonly Exclude<DifficultyAxis, 'blockCount'>[] = [
+  'numberRange',
+  'targetComplexity',
+];
 
 export function createInitialDifficultyLevels(): DifficultyAxisLevels {
   return {
@@ -162,9 +166,15 @@ export function getScoreMultiplier(difficultyScore: number): number {
 }
 
 export function getTimeDifficultyLevel(round: number): number {
-  const safeRound = Math.max(1, Math.floor(round));
-  const level = Math.floor((safeRound - 1) / TIME_LEVEL_INTERVAL_ROUNDS);
-  return clamp(level, 0, TIME_LIMIT_LEVELS.length - 1);
+  const intervalIndex = getCountTimeIntervalIndex(round);
+  const timeLevel = Math.floor(intervalIndex / 2);
+  return clamp(timeLevel, 0, TIME_LIMIT_LEVELS.length - 1);
+}
+
+export function getBlockCountDifficultyLevel(round: number): number {
+  const intervalIndex = getCountTimeIntervalIndex(round);
+  const blockCountLevel = Math.floor((intervalIndex + 1) / 2);
+  return clamp(blockCountLevel, 0, BLOCK_COUNT_LEVELS.length - 1);
 }
 
 export function resolveRoundDifficulty(
@@ -172,13 +182,18 @@ export function resolveRoundDifficulty(
   levels: DifficultyAxisLevels
 ): ResolvedRoundDifficulty {
   const timeDifficultyLevel = getTimeDifficultyLevel(round);
+  const blockCountDifficultyLevel = getBlockCountDifficultyLevel(round);
+  const effectiveLevels: DifficultyAxisLevels = {
+    ...levels,
+    blockCount: blockCountDifficultyLevel,
+  };
 
   return {
-    generationConfig: resolveGenerationConfig(levels),
+    generationConfig: resolveGenerationConfig(levels, blockCountDifficultyLevel),
     timeLimit: TIME_LIMIT_LEVELS[timeDifficultyLevel],
     timeDifficultyLevel,
-    difficultyScore: getDifficultyScore(levels),
-    difficultyName: getDifficultyName(levels),
+    difficultyScore: getDifficultyScore(effectiveLevels),
+    difficultyName: getDifficultyName(effectiveLevels),
   };
 }
 
@@ -206,14 +221,14 @@ export function upgradeDifficulty(
   history: DifficultyAxis[],
   randomFn: () => number = Math.random
 ): DifficultyUpgradeResult {
-  const upgradableAxes = AXES.filter((axis) => levels[axis] < MAX_LEVEL_BY_AXIS[axis]);
+  const upgradableAxes = RANDOM_UPGRADE_AXES.filter((axis) => levels[axis] < MAX_LEVEL_BY_AXIS[axis]);
   if (upgradableAxes.length === 0) {
     return {
       levels: { ...levels },
       history: [...history],
       upgradedAxis: null,
       blockedByScoreCap: false,
-      reachedMaxDifficulty: true,
+      reachedMaxDifficulty: isMaxRandomUpgradeDifficulty(levels),
     };
   }
 
@@ -235,7 +250,7 @@ export function upgradeDifficulty(
         history: appendHistory(history, selectedAxis),
         upgradedAxis: selectedAxis,
         blockedByScoreCap: false,
-        reachedMaxDifficulty: isMaxDifficulty(nextLevels),
+        reachedMaxDifficulty: isMaxRandomUpgradeDifficulty(nextLevels),
       };
     }
 
@@ -247,7 +262,7 @@ export function upgradeDifficulty(
     history: [...history],
     upgradedAxis: null,
     blockedByScoreCap: true,
-    reachedMaxDifficulty: isMaxDifficulty(levels),
+    reachedMaxDifficulty: isMaxRandomUpgradeDifficulty(levels),
   };
 }
 
@@ -321,19 +336,31 @@ export function summarizeDifficultyMetrics(entries: RoundTelemetryEntry[]): Diff
   };
 }
 
-function resolveGenerationConfig(levels: DifficultyAxisLevels): RoundGenerationConfig {
+function resolveGenerationConfig(
+  levels: DifficultyAxisLevels,
+  blockCountDifficultyLevel: number
+): RoundGenerationConfig {
   const numberRange = NUMBER_RANGE_LEVELS[clamp(levels.numberRange, 0, MAX_LEVEL_BY_AXIS.numberRange)];
   const targetComplexity =
     TARGET_COMPLEXITY_LEVELS[clamp(levels.targetComplexity, 0, MAX_LEVEL_BY_AXIS.targetComplexity)];
 
   return {
-    blockCount: BLOCK_COUNT_LEVELS[clamp(levels.blockCount, 0, MAX_LEVEL_BY_AXIS.blockCount)],
+    blockCount: BLOCK_COUNT_LEVELS[clamp(blockCountDifficultyLevel, 0, BLOCK_COUNT_LEVELS.length - 1)],
     minValue: numberRange.minValue,
     maxValue: numberRange.maxValue,
     maxRemove: targetComplexity.maxRemove,
     preferRemove: targetComplexity.preferRemove,
     maxTargetSum: targetComplexity.maxTargetSum,
   };
+}
+
+function getCountTimeIntervalIndex(round: number): number {
+  const safeRound = Math.max(1, Math.floor(round));
+  return Math.floor((safeRound - 1) / COUNT_TIME_LEVEL_INTERVAL_ROUNDS);
+}
+
+function isMaxRandomUpgradeDifficulty(levels: DifficultyAxisLevels): boolean {
+  return RANDOM_UPGRADE_AXES.every((axis) => levels[axis] >= MAX_LEVEL_BY_AXIS[axis]);
 }
 
 function wouldCreateTripleStreak(history: DifficultyAxis[], candidateAxis: DifficultyAxis): boolean {
