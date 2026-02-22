@@ -255,7 +255,7 @@ export class GameScene extends Phaser.Scene {
     const targetY = height * 0.15;
 
     this.targetLabel = this.add
-      .text(width / 2, targetY - 25, '紐⑺몴', {
+      .text(width / 2, targetY - 25, '목표', {
         fontSize: '18px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_SECONDARY,
@@ -509,7 +509,7 @@ export class GameScene extends Phaser.Scene {
     const targetY = this.targetText.y;
 
     const mark = this.add
-      .text(targetX, targetY, '정답!', {
+      .text(targetX, targetY, '○', {
         fontSize: '80px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#4ecca3',
@@ -535,7 +535,7 @@ export class GameScene extends Phaser.Scene {
     const thumbY = this.targetText.y;
 
     const thumb = this.add
-      .text(thumbX - 30, thumbY, 'GOOD', {
+      .text(thumbX - 30, thumbY, '👍', {
         fontSize: '36px',
       })
       .setOrigin(0, 0.5)
@@ -566,7 +566,7 @@ export class GameScene extends Phaser.Scene {
     const targetY = this.targetText.y;
 
     const mark = this.add
-      .text(targetX, targetY, '오답!', {
+      .text(targetX, targetY, '✕', {
         fontSize: '80px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#e94560',
