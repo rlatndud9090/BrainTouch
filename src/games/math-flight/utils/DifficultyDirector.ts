@@ -31,10 +31,12 @@ export interface DifficultyDowngradeResult {
   downgradedAxis: DifficultyAxis | null;
 }
 
-const FALL_SPEED_LEVELS = [1.0, 1.1, 1.22, 1.36, 1.52, 1.7] as const;
+const FALL_SPEED_MIN = 1.0;
+const FALL_SPEED_MAX = 2.0;
+const FALL_SPEED_STEP = 0.04;
+const MAX_FALL_SPEED_LEVEL = Math.round((FALL_SPEED_MAX - FALL_SPEED_MIN) / FALL_SPEED_STEP);
 
 const NUMBER_GAP_LEVELS: readonly NumberGapConfig[] = [
-  { minGap: 9, maxGap: 14 },
   { minGap: 7, maxGap: 12 },
   { minGap: 6, maxGap: 10 },
   { minGap: 5, maxGap: 8 },
@@ -42,13 +44,16 @@ const NUMBER_GAP_LEVELS: readonly NumberGapConfig[] = [
   { minGap: 3, maxGap: 5 },
 ];
 
+const FALL_SPEED_INTERVAL_WAVES = 4;
+const NUMBER_GAP_INTERVAL_WAVES = 12;
+
 const AXIS_WEIGHTS: Record<DifficultyAxis, number> = {
   fallSpeed: 0.45,
   numberGap: 0.55,
 };
 
 const MAX_LEVEL_BY_AXIS: Record<DifficultyAxis, number> = {
-  fallSpeed: FALL_SPEED_LEVELS.length - 1,
+  fallSpeed: MAX_FALL_SPEED_LEVEL,
   numberGap: NUMBER_GAP_LEVELS.length - 1,
 };
 
@@ -94,11 +99,21 @@ export function getDifficultyName(levels: DifficultyAxisLevels): string {
 }
 
 export function resolveRoundDifficulty(
-  _round: number,
-  levels: DifficultyAxisLevels
+  round: number,
+  _levels: DifficultyAxisLevels
 ): ResolvedRoundDifficulty {
-  const speedMultiplier = FALL_SPEED_LEVELS[clamp(levels.fallSpeed, 0, MAX_LEVEL_BY_AXIS.fallSpeed)];
-  const gapConfig = NUMBER_GAP_LEVELS[clamp(levels.numberGap, 0, MAX_LEVEL_BY_AXIS.numberGap)];
+  const fallSpeedLevel = getFallSpeedLevel(round);
+  const numberGapLevel = getNumberGapLevel(round);
+  const speedMultiplier = clamp(
+    FALL_SPEED_MIN + fallSpeedLevel * FALL_SPEED_STEP,
+    FALL_SPEED_MIN,
+    FALL_SPEED_MAX,
+  );
+  const gapConfig = NUMBER_GAP_LEVELS[numberGapLevel];
+  const scheduledLevels: DifficultyAxisLevels = {
+    fallSpeed: fallSpeedLevel,
+    numberGap: numberGapLevel,
+  };
 
   return {
     speedMultiplier,
@@ -106,9 +121,21 @@ export function resolveRoundDifficulty(
       minGap: gapConfig.minGap,
       maxGap: gapConfig.maxGap,
     },
-    difficultyScore: getDifficultyScore(levels),
-    difficultyName: getDifficultyName(levels),
+    difficultyScore: getDifficultyScore(scheduledLevels),
+    difficultyName: getDifficultyName(scheduledLevels),
   };
+}
+
+function getFallSpeedLevel(round: number): number {
+  const safeRound = Math.max(1, Math.floor(round));
+  const level = Math.floor(safeRound / FALL_SPEED_INTERVAL_WAVES);
+  return clamp(level, 0, MAX_LEVEL_BY_AXIS.fallSpeed);
+}
+
+function getNumberGapLevel(round: number): number {
+  const safeRound = Math.max(1, Math.floor(round));
+  const level = Math.floor((safeRound - 1) / NUMBER_GAP_INTERVAL_WAVES);
+  return clamp(level, 0, MAX_LEVEL_BY_AXIS.numberGap);
 }
 
 export function upgradeDifficulty(
