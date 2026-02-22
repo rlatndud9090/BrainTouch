@@ -1,64 +1,51 @@
-import Phaser from 'phaser';
+﻿import Phaser from 'phaser';
+import { BalloonData, generateBalloons, getCorrectOrder } from '../utils/BalloonGenerator';
 import {
-  BalloonData,
-  generateBalloons,
-  getCorrectOrder,
-  getRoundConfig,
-} from '../utils/BalloonGenerator';
+  DifficultyAxis,
+  DifficultyAxisLevels,
+  DifficultyDowngradeReason,
+  ROUND_UPGRADE_INTERVAL,
+  createInitialDifficultyLevels,
+  downgradeDifficultyOnFail,
+  resolveRoundDifficulty,
+  upgradeDifficulty,
+} from '../utils/DifficultyDirector';
 import { showStartScreen } from '../../../shared/ui';
 import { TopBar, TOP_BAR } from '../../../shared/topBar';
-import { BASE_COLORS } from '../../../shared/colors';
 import { FONTS } from '../../../shared/constants';
 
-// 게임 색상
 const COLORS = {
   BG_SKY: 0x87ceeb,
   TEXT_PRIMARY: '#ffffff',
   TEXT_DARK: '#2c3e50',
   TEXT_SECONDARY: '#7f8c8d',
-  HUD_BG: 0x2c3e50,
   SUCCESS: 0x4ecca3,
   FAIL: 0xe94560,
-  TIME_WARNING: '#c0392b', // 어두운 빨간색 (하늘 배경용)
-  TIME_NORMAL: '#2c3e50', // 어두운 색 (하늘 배경용)
-};
-
-// ========================================
-// 🎮 라운드 제한시간 설정 (초 단위)
-// 형님이 테스트 후 조정하기 쉽게 분리
-// ========================================
-const ROUND_TIME_CONFIG = {
-  // 초반 (1~3 라운드): 여유롭게
-  EARLY: 10,
-  // 중반 (4~7 라운드): 보통
-  MID: 8,
-  // 후반 (8+ 라운드): 빠르게
-  LATE: 6,
-  // 라운드 구간 기준
-  EARLY_THRESHOLD: 4,
-  MID_THRESHOLD: 8,
+  TIME_WARNING: '#c0392b',
+  TIME_NORMAL: '#2c3e50',
 } as const;
 
-// 라운드에 따른 제한시간 반환
-function getRoundTimeLimit(round: number): number {
-  if (round < ROUND_TIME_CONFIG.EARLY_THRESHOLD) {
-    return ROUND_TIME_CONFIG.EARLY;
-  } else if (round < ROUND_TIME_CONFIG.MID_THRESHOLD) {
-    return ROUND_TIME_CONFIG.MID;
-  } else {
-    return ROUND_TIME_CONFIG.LATE;
-  }
-}
-
-// 풍선 물리 설정
 const BALLOON_PHYSICS = {
-  RESTITUTION: 0.8, // 탄성 (튕김 정도)
-  FRICTION: 0, // 마찰 없음
-  FRICTION_AIR: 0.01, // 공기 저항 (서서히 느려짐)
-  INITIAL_SPEED: 1.5, // 초기 속도
-};
+  RESTITUTION: 0.8,
+  FRICTION: 0,
+  FRICTION_AIR: 0.01,
+  INITIAL_SPEED: 1.5,
+} as const;
 
-// Matter.js 풍선 정보
+const TIMER_BAR = {
+  HEIGHT: 12,
+  TOP_OFFSET: 10,
+  SIDE_PADDING: 16,
+  MAX_WIDTH: 520,
+} as const;
+
+const TIMER_BAR_COLORS = {
+  NORMAL: 0x4ecca3,
+  WARNING: 0xffc947,
+  DANGER: 0xe94560,
+  BACKGROUND: 0x000000,
+} as const;
+
 interface BalloonBody {
   data: BalloonData;
   body: MatterJS.BodyType;
@@ -68,28 +55,31 @@ interface BalloonBody {
 }
 
 export class GameScene extends Phaser.Scene {
-  // 게임 상태
   private score = 0;
   private round = 1;
   private totalPopped = 0;
+  private successfulRounds = 0;
   private isPlaying = false;
 
-  // 라운드 타이머
-  private roundTimeLimit = 0; // 현재 라운드 제한시간 (초)
-  private roundTimeLeft = 0; // 남은 시간 (ms)
+  private difficultyLevels: DifficultyAxisLevels = createInitialDifficultyLevels();
+  private difficultyUpgradeHistory: DifficultyAxis[] = [];
+
+  private roundTimeLimit = 0;
+  private roundTimeLeft = 0;
   private roundTimerEvent?: Phaser.Time.TimerEvent;
 
-  // 현재 라운드
   private balloons: BalloonData[] = [];
   private balloonBodies: BalloonBody[] = [];
   private correctOrder: number[] = [];
   private currentIndex = 0;
 
-  // UI 요소
   private topBar!: TopBar;
   private instructionText!: Phaser.GameObjects.Text;
+  private timerBarBg!: Phaser.GameObjects.Rectangle;
+  private timerBarFill!: Phaser.GameObjects.Rectangle;
+  private timerBarWidth = 0;
+  private timerBarY = 0;
 
-  // 게임 영역
   private gameAreaWidth = 0;
   private gameAreaHeight = 0;
   private gameAreaTop = 0;
@@ -101,26 +91,25 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
 
-    // 상태 초기화
     this.score = 0;
     this.round = 1;
     this.totalPopped = 0;
+    this.successfulRounds = 0;
     this.isPlaying = false;
+
+    this.difficultyLevels = createInitialDifficultyLevels();
+    this.difficultyUpgradeHistory = [];
+
     this.balloonBodies = [];
     this.currentIndex = 0;
     this.roundTimeLimit = 0;
     this.roundTimeLeft = 0;
 
-    // 레이아웃 계산
     this.calculateLayout(width, height);
-
-    // 배경
     this.createBackground(width, height);
 
-    // HUD
-    this.createHUD(width);
+    this.createHUD();
 
-    // 안내 텍스트
     this.instructionText = this.add
       .text(width / 2, this.gameAreaTop - 30, '작은 숫자부터 순서대로 터치!', {
         fontSize: '18px',
@@ -131,73 +120,60 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlpha(0);
 
-    // Matter.js 월드 경계 설정 (게임 영역만)
     this.setupWorldBounds(width, height);
 
-    // 시작 화면 표시
     showStartScreen(this, {
-      title: '🎈 작은 숫자부터 터치하세요!',
-      subtitle: '순서대로 풍선을 터뜨리면 성공',
+      title: '숫자 풍선을 순서대로 터치하세요!',
+      subtitle: '작은 숫자부터 터치하면 성공',
       onStart: () => this.startGame(),
     });
 
-    // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
   }
 
   update(): void {
-    // 풍선 그래픽을 물리 바디 위치에 동기화
     this.balloonBodies.forEach((balloon) => {
-      if (balloon.isPopped) return;
+      if (balloon.isPopped) {
+        return;
+      }
 
-      const { body, graphics, text, data } = balloon;
-      const x = body.position.x;
-      const y = body.position.y;
-
-      // 그래픽 위치 업데이트
-      graphics.setPosition(x, y + this.gameAreaTop);
-      text.setPosition(x, y + this.gameAreaTop);
+      const x = balloon.body.position.x;
+      const y = balloon.body.position.y;
+      balloon.graphics.setPosition(x, y + this.gameAreaTop);
+      balloon.text.setPosition(x, y + this.gameAreaTop);
     });
   }
 
   private calculateLayout(width: number, height: number): void {
     const hudHeight = TOP_BAR.HEIGHT;
-    const difficultyHeight = 25; // 난이도 텍스트 영역
+    const difficultyHeight = 30;
     const instructionHeight = 40;
+
     this.gameAreaTop = hudHeight + difficultyHeight + instructionHeight;
     this.gameAreaWidth = width;
     this.gameAreaHeight = height - this.gameAreaTop - 20;
   }
 
-  private setupWorldBounds(width: number, height: number): void {
-    // 게임 영역에 벽 설정
+  private setupWorldBounds(width: number, _height: number): void {
     const wallThickness = 50;
-    const gameTop = 0;
-    const gameBottom = this.gameAreaHeight;
-    const gameLeft = 0;
-    const gameRight = width;
-
-    // 사각형 경계 생성 (정적 바디)
     this.matter.world.setBounds(
-      gameLeft,
-      gameTop,
-      gameRight - gameLeft,
-      gameBottom - gameTop,
+      0,
+      0,
+      width,
+      this.gameAreaHeight,
       wallThickness,
-      true, // left
-      true, // right
-      true, // top
-      true // bottom
+      true,
+      true,
+      true,
+      true
     );
   }
 
   private createBackground(width: number, height: number): void {
-    // 하늘색 그라데이션 배경
     const bg = this.add.graphics();
     bg.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xb0e0e6, 0xb0e0e6);
     bg.fillRect(0, 0, width, height);
 
-    // 구름 장식
     this.addClouds(width);
   }
 
@@ -218,45 +194,90 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private createHUD(width: number): void {
-    // 공통 상단 바 생성: 하트 | 라운드 시간 | 점수 (배경 없음, 어두운 색상)
+  private createHUD(): void {
     this.topBar = new TopBar(this, {
       left: { type: 'lives', maxLives: 3 },
-      center: { type: 'time', initialValue: 10, color: COLORS.TEXT_DARK },
       right: { type: 'score', initialValue: 0, color: COLORS.TEXT_DARK },
     });
 
-    // 대기 화면 동안 숨김 (폰트 로딩 전 깨짐 방지)
     this.topBar.setAlpha(0);
+    this.createTimerBar(this.scale.width);
+    this.setTimerBarAlpha(0);
+  }
+
+  private createTimerBar(width: number): void {
+    this.timerBarWidth = Math.min(width - TIMER_BAR.SIDE_PADDING * 2, TIMER_BAR.MAX_WIDTH);
+    this.timerBarY = TOP_BAR.HEIGHT + TIMER_BAR.TOP_OFFSET;
+    const leftX = (width - this.timerBarWidth) / 2;
+
+    this.timerBarBg = this.add
+      .rectangle(width / 2, this.timerBarY, this.timerBarWidth, TIMER_BAR.HEIGHT, TIMER_BAR_COLORS.BACKGROUND, 0.25)
+      .setDepth(110);
+
+    this.timerBarFill = this.add
+      .rectangle(leftX, this.timerBarY, this.timerBarWidth, TIMER_BAR.HEIGHT, TIMER_BAR_COLORS.NORMAL, 0.95)
+      .setOrigin(0, 0.5)
+      .setDepth(111);
+  }
+
+  private setTimerBarAlpha(alpha: number): void {
+    this.timerBarBg?.setAlpha(alpha);
+    this.timerBarFill?.setAlpha(alpha);
+  }
+
+  private updateTimerBar(): void {
+    if (!this.timerBarFill) {
+      return;
+    }
+
+    const maxMs = this.roundTimeLimit * 1000;
+    const ratio = maxMs > 0 ? Phaser.Math.Clamp(this.roundTimeLeft / maxMs, 0, 1) : 0;
+    this.timerBarFill.displayWidth = this.timerBarWidth * ratio;
+
+    const color =
+      ratio <= 0.3
+        ? TIMER_BAR_COLORS.DANGER
+        : ratio <= 0.6
+          ? TIMER_BAR_COLORS.WARNING
+          : TIMER_BAR_COLORS.NORMAL;
+    this.timerBarFill.setFillStyle(color, 0.95);
+  }
+
+  private handleTimerBarResize(width: number): void {
+    this.timerBarWidth = Math.min(width - TIMER_BAR.SIDE_PADDING * 2, TIMER_BAR.MAX_WIDTH);
+    this.timerBarY = TOP_BAR.HEIGHT + TIMER_BAR.TOP_OFFSET;
+    const leftX = (width - this.timerBarWidth) / 2;
+
+    this.timerBarBg
+      ?.setPosition(width / 2, this.timerBarY)
+      .setSize(this.timerBarWidth, TIMER_BAR.HEIGHT);
+
+    this.timerBarFill?.setPosition(leftX, this.timerBarY);
+    this.updateTimerBar();
   }
 
   private prepareRound(): void {
-    // 기존 타이머 정리
     this.roundTimerEvent?.destroy();
 
-    // 기존 풍선 제거
     this.balloonBodies.forEach((balloon) => {
       this.matter.world.remove(balloon.body);
       balloon.graphics.destroy();
       balloon.text.destroy();
     });
+
     this.balloonBodies = [];
     this.currentIndex = 0;
 
-    // 풍선 생성
-    this.balloons = generateBalloons(this.round, this.gameAreaWidth, this.gameAreaHeight);
+    const roundDifficulty = resolveRoundDifficulty(this.round, this.difficultyLevels);
+    this.balloons = generateBalloons(roundDifficulty.generationConfig, this.gameAreaWidth, this.gameAreaHeight);
     this.correctOrder = getCorrectOrder(this.balloons);
 
-    // 풍선 물리 바디 생성
     this.createBalloonBodies();
 
-    // 라운드 타이머 설정
-    this.roundTimeLimit = getRoundTimeLimit(this.round);
+    this.roundTimeLimit = roundDifficulty.timeLimit;
     this.roundTimeLeft = this.roundTimeLimit * 1000;
-    this.topBar.updateValue('center', this.roundTimeLimit);
-    this.topBar.setColor('center', COLORS.TIME_NORMAL); // 색상 리셋
+    this.updateTimerBar();
 
-    // 라운드 타이머 시작
     this.startRoundTimer();
   }
 
@@ -268,7 +289,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBalloonBody(data: BalloonData): BalloonBody {
-    // Matter.js 원형 바디 생성
     const body = this.matter.add.circle(data.x, data.y, data.size, {
       restitution: BALLOON_PHYSICS.RESTITUTION,
       friction: BALLOON_PHYSICS.FRICTION,
@@ -276,7 +296,6 @@ export class GameScene extends Phaser.Scene {
       label: `balloon_${data.id}`,
     });
 
-    // 랜덤 초기 속도 (빙글빙글 떠다니게)
     const speed = BALLOON_PHYSICS.INITIAL_SPEED;
     const angle = Math.random() * Math.PI * 2;
     this.matter.body.setVelocity(body, {
@@ -284,12 +303,10 @@ export class GameScene extends Phaser.Scene {
       y: Math.sin(angle) * speed,
     });
 
-    // 풍선 그래픽 생성
     const graphics = this.add.graphics();
     this.drawBalloon(graphics, data);
     graphics.setPosition(data.x, data.y + this.gameAreaTop);
 
-    // 숫자 텍스트 (Cherry Bomb One 폰트, 풍선 크기에 맞게)
     const fontSize = Math.max(data.size * 0.85, 28);
     const text = this.add
       .text(data.x, data.y + this.gameAreaTop, String(data.value), {
@@ -299,7 +316,6 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 인터랙티브 설정
     graphics.setInteractive(new Phaser.Geom.Circle(0, 0, data.size), Phaser.Geom.Circle.Contains);
 
     const balloonBody: BalloonBody = {
@@ -310,9 +326,11 @@ export class GameScene extends Phaser.Scene {
       isPopped: false,
     };
 
-    // 클릭 이벤트
     graphics.on('pointerdown', () => {
-      if (!this.isPlaying || balloonBody.isPopped) return;
+      if (!this.isPlaying || balloonBody.isPopped) {
+        return;
+      }
+
       this.onBalloonTap(balloonBody);
     });
 
@@ -320,19 +338,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawBalloon(graphics: Phaser.GameObjects.Graphics, data: BalloonData): void {
-    // 풍선 본체 (원)
     graphics.fillStyle(data.color, 1);
     graphics.fillCircle(0, 0, data.size);
 
-    // 하이라이트 (빛 반사 효과)
     graphics.fillStyle(0xffffff, 0.3);
     graphics.fillCircle(-data.size * 0.3, -data.size * 0.3, data.size * 0.25);
 
-    // 풍선 꼭지
     graphics.fillStyle(data.color, 1);
     graphics.fillTriangle(-5, data.size, 5, data.size, 0, data.size + 15);
 
-    // 끈
     graphics.lineStyle(2, 0x888888, 0.8);
     graphics.lineBetween(0, data.size + 15, 0, data.size + 40);
   }
@@ -342,9 +356,10 @@ export class GameScene extends Phaser.Scene {
 
     if (balloon.data.id === expectedId) {
       this.handleCorrectTap(balloon);
-    } else {
-      this.handleWrongTap(balloon);
+      return;
     }
+
+    this.handleWrongTap(balloon);
   }
 
   private handleCorrectTap(balloon: BalloonBody): void {
@@ -352,35 +367,29 @@ export class GameScene extends Phaser.Scene {
     this.currentIndex++;
     this.totalPopped++;
 
-    // 점수 추가
     const points = 10 * this.round;
     this.score += points;
     this.topBar.updateValue('right', this.score);
 
-    // 터지는 애니메이션
     this.popBalloon(balloon, true);
 
-    // 라운드 클리어 체크
     if (this.currentIndex >= this.balloons.length) {
       this.handleRoundClear();
     }
   }
 
   private handleWrongTap(balloon: BalloonBody): void {
-    // 하트 감소 (타이머는 계속 진행)
-    const isGameOver = this.topBar.loseLife('left');
+    this.applyDifficultyDowngradeOnFail('wrongTap');
 
-    // 틀린 피드백
+    const isGameOver = this.topBar.loseLife('left');
     this.showWrongFeedback(balloon);
 
-    // 게임 오버 체크
     if (isGameOver) {
       this.roundTimerEvent?.destroy();
       this.time.delayedCall(500, () => {
         this.endGame();
       });
     }
-    // 게임 오버가 아니면 풍선은 그대로, 타이머도 계속 진행
   }
 
   private popBalloon(balloon: BalloonBody, success: boolean): void {
@@ -388,10 +397,8 @@ export class GameScene extends Phaser.Scene {
     const x = graphics.x;
     const y = graphics.y;
 
-    // 물리 바디 비활성화
     this.matter.world.remove(body);
 
-    // 파티클 효과
     const particles = this.add.graphics();
     particles.fillStyle(data.color, 0.8);
     for (let i = 0; i < 8; i++) {
@@ -407,7 +414,6 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => particles.destroy(),
     });
 
-    // 터지는 애니메이션
     this.tweens.add({
       targets: [graphics, text],
       scaleX: 1.3,
@@ -421,33 +427,32 @@ export class GameScene extends Phaser.Scene {
       },
     });
 
-    // 점수 표시
-    if (success) {
-      const points = 10 * this.round;
-      const pointsText = this.add
-        .text(x, y, `+${points}`, {
-          fontSize: '24px',
-          fontFamily: 'Pretendard, sans-serif',
-          color: '#4ecca3',
-          fontStyle: 'bold',
-        })
-        .setOrigin(0.5);
-
-      this.tweens.add({
-        targets: pointsText,
-        y: pointsText.y - 40,
-        alpha: 0,
-        duration: 500,
-        onComplete: () => pointsText.destroy(),
-      });
+    if (!success) {
+      return;
     }
+
+    const points = 10 * this.round;
+    const pointsText = this.add
+      .text(x, y, `+${points}`, {
+        fontSize: '24px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#4ecca3',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    this.tweens.add({
+      targets: pointsText,
+      y: pointsText.y - 40,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => pointsText.destroy(),
+    });
   }
 
   private showWrongFeedback(balloon: BalloonBody): void {
-    // 화면 흔들기
     this.cameras.main.shake(200, 0.01);
 
-    // 풍선에 충격 주기 (튕겨나가게)
     const pushForce = 0.05;
     const angle = Math.random() * Math.PI * 2;
     this.matter.body.applyForce(balloon.body, balloon.body.position, {
@@ -455,10 +460,12 @@ export class GameScene extends Phaser.Scene {
       y: Math.sin(angle) * pushForce,
     });
 
-    // X 표시
     const xMark = this.add
-      .text(balloon.graphics.x, balloon.graphics.y, '❌', {
+      .text(balloon.graphics.x, balloon.graphics.y, 'X', {
         fontSize: '40px',
+        fontFamily: 'Pretendard, sans-serif',
+        color: '#e94560',
+        fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
@@ -472,14 +479,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleRoundClear(): void {
-    // 타이머 정지
     this.roundTimerEvent?.destroy();
+
+    this.successfulRounds++;
+    if (this.successfulRounds > 0 && this.successfulRounds % ROUND_UPGRADE_INTERVAL === 0) {
+      this.applyDifficultyUpgrade();
+    }
 
     this.round++;
 
-    // 라운드 클리어 표시
     const clearText = this.add
-      .text(this.scale.width / 2, this.scale.height / 2, '🎉 Clear!', {
+      .text(this.scale.width / 2, this.scale.height / 2, 'Clear!', {
         fontSize: '48px',
         fontFamily: 'Pretendard, sans-serif',
         color: COLORS.TEXT_DARK,
@@ -502,18 +512,31 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private applyDifficultyUpgrade(): void {
+    const upgradeResult = upgradeDifficulty(this.difficultyLevels, this.difficultyUpgradeHistory);
+    this.difficultyLevels = upgradeResult.levels;
+    this.difficultyUpgradeHistory = upgradeResult.history;
+  }
+
+  private applyDifficultyDowngradeOnFail(reason: DifficultyDowngradeReason): void {
+    const downgradeResult = downgradeDifficultyOnFail(this.difficultyLevels, reason);
+    this.difficultyLevels = downgradeResult.levels;
+  }
+
   private startGame(): void {
     this.isPlaying = true;
 
-    // TopBar 및 안내 텍스트 표시
     this.topBar.setAlpha(1);
     this.instructionText.setAlpha(1);
+    this.setTimerBarAlpha(1);
 
     this.prepareRound();
   }
 
   private startRoundTimer(): void {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying) {
+      return;
+    }
 
     this.roundTimerEvent = this.time.addEvent({
       delay: 100,
@@ -524,35 +547,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateRoundTimer(): void {
-    if (!this.isPlaying) return;
-
-    this.roundTimeLeft -= 100;
-
-    const seconds = Math.max(0, this.roundTimeLeft / 1000);
-    this.topBar.updateValue('center', parseFloat(seconds.toFixed(1)));
-
-    // 3초 이하일 때 빨간색
-    if (this.roundTimeLeft <= 3000) {
-      this.topBar.setColor('center', COLORS.TIME_WARNING);
+    if (!this.isPlaying) {
+      return;
     }
 
-    // 시간 초과 = 하트 감소
+    this.roundTimeLeft -= 100;
+    this.updateTimerBar();
+
     if (this.roundTimeLeft <= 0) {
       this.handleTimeOut();
     }
   }
 
   private handleTimeOut(): void {
-    // 타이머 정지
     this.roundTimerEvent?.destroy();
 
-    // 하트 감소
-    const isGameOver = this.topBar.loseLife('left');
+    this.applyDifficultyDowngradeOnFail('timeout');
 
-    // 시간 초과 피드백
+    const isGameOver = this.topBar.loseLife('left');
     this.showTimeOutFeedback();
 
-    // 게임 오버 체크
     if (isGameOver) {
       this.time.delayedCall(800, () => {
         this.endGame();
@@ -560,7 +574,6 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // 같은 라운드 재시작 (풍선 재배치)
     this.time.delayedCall(800, () => {
       if (this.isPlaying) {
         this.prepareRound();
@@ -571,11 +584,10 @@ export class GameScene extends Phaser.Scene {
   private showTimeOutFeedback(): void {
     const { width, height } = this.scale;
 
-    // 화면 흔들기
     this.cameras.main.shake(200, 0.01);
 
     const text = this.add
-      .text(width / 2, height / 2, '⏱️ 시간 초과!', {
+      .text(width / 2, height / 2, '시간 초과!', {
         fontSize: '36px',
         fontFamily: 'Pretendard, sans-serif',
         color: '#e94560',
@@ -609,7 +621,8 @@ export class GameScene extends Phaser.Scene {
     this.calculateLayout(width, height);
     this.setupWorldBounds(width, height);
 
-    // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);
+    this.handleTimerBarResize(width);
   }
 }
+
