@@ -1,4 +1,4 @@
-﻿import type { RoundGenerationConfig } from './BlockGenerator';
+import type { RoundGenerationConfig } from './BlockGenerator';
 
 export type DifficultyAxis = 'blockCount' | 'numberRange' | 'targetComplexity';
 

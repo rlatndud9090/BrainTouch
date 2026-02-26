@@ -11,6 +11,20 @@ import * as tf from '@tensorflow/tfjs';
 const MODEL_URL =
   'https://storage.googleapis.com/tfjs-models/tfjs/mnist_transfer_cnn_v1/model.json';
 
+interface ImportMetaWithEnv extends ImportMeta {
+  env?: {
+    DEV?: boolean;
+  };
+}
+
+const isDebugLoggingEnabled = Boolean((import.meta as ImportMetaWithEnv).env?.DEV);
+
+function debugLog(...args: unknown[]): void {
+  if (isDebugLoggingEnabled) {
+    console.log(...args);
+  }
+}
+
 export interface DigitBounds {
   minX: number;
   minY: number;
@@ -33,10 +47,10 @@ export class DigitRecognizer {
     this.isLoading = true;
 
     try {
-      console.log('[DigitRecognizer] 모델 로딩 시작...');
+      debugLog('[DigitRecognizer] 모델 로딩 시작...');
 
       await tf.ready();
-      console.log('[DigitRecognizer] TF 백엔드:', tf.getBackend());
+      debugLog('[DigitRecognizer] TF 백엔드:', tf.getBackend());
 
       this.model = await tf.loadLayersModel(MODEL_URL);
 
@@ -48,7 +62,7 @@ export class DigitRecognizer {
 
       this.isReady = true;
       this.isLoading = false;
-      console.log('[DigitRecognizer] 모델 로딩 완료!');
+      debugLog('[DigitRecognizer] 모델 로딩 완료!');
       return true;
     } catch (error) {
       console.error('[DigitRecognizer] 모델 로딩 실패:', error);
@@ -87,7 +101,7 @@ export class DigitRecognizer {
       tensor.dispose();
       prediction.dispose();
 
-      console.log(`[DigitRecognizer] 인식: ${maxIndex} (${(maxProb * 100).toFixed(1)}%)`);
+      debugLog(`[DigitRecognizer] 인식: ${maxIndex} (${(maxProb * 100).toFixed(1)}%)`);
 
       if (maxProb < 0.25) {
         return -1;
@@ -120,7 +134,7 @@ export class DigitRecognizer {
 
     // 가로 세로 비율로 1자리 vs 2자리 판단
     const aspectRatio = width / height;
-    console.log(`[DigitRecognizer] 비율: ${aspectRatio.toFixed(2)}, 크기: ${width}x${height}`);
+    debugLog(`[DigitRecognizer] 비율: ${aspectRatio.toFixed(2)}, 크기: ${width}x${height}`);
 
     if (aspectRatio > 1.2) {
       // 2자리 숫자 - 분할

@@ -125,7 +125,7 @@ feat(brain-touch): 메인 메뉴 및 게임 플레이 씬 구현
 ## ✅ 체크리스트
 - [ ] 로컬에서 테스트 완료
 - [ ] 모바일 터치 테스트 완료
-- [ ] 린트 에러 없음
+- [ ] `npm run build` 통과
 ```
 
 ---
@@ -134,25 +134,17 @@ feat(brain-touch): 메인 메뉴 및 게임 플레이 씬 구현
 
 ```
 src/
-├── main.ts                    # 진입점
-├── game/
-│   └── config.ts              # Phaser 설정
-├── scenes/                    # 씬 파일들
-│   ├── MainScene.ts
-│   ├── GameScene.ts
-│   └── GameOverScene.ts
-├── objects/                   # 게임 오브젝트 (스프라이트 등)
-│   └── Player.ts
-├── utils/                     # 유틸리티 함수
-│   └── math.ts
-└── types/                     # 타입 정의
-    └── game.d.ts
-
-public/
-└── assets/                    # 정적 에셋
-    ├── images/
-    ├── audio/
-    └── fonts/
+├── App.tsx                    # 라우팅 루트
+├── main.tsx                   # React 진입점
+├── assets/                    # 스프라이트/아이콘 등 정적 리소스
+├── components/                # 공통 React 컴포넌트
+├── pages/                     # Home/Game/Share 페이지
+├── shared/                    # 공통 상수/유틸/공유 로직
+└── games/                     # 게임별 모듈
+    └── <game-id>/
+        ├── config.ts          # 게임별 Phaser 설정
+        ├── scenes/            # GameScene / ResultScene
+        └── utils/             # 게임 로직 유틸
 ```
 
 ---
@@ -189,4 +181,3 @@ git push origin feature/brain-touch-new-feature
 ---
 
 > 📌 이 규칙은 팀 상황에 따라 유연하게 조정 가능합니다.
-

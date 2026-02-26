@@ -1,4 +1,4 @@
-﻿import type { RoundGenerationConfig } from './BalloonGenerator';
+import type { RoundGenerationConfig } from './BalloonGenerator';
 
 export type DifficultyAxis = 'balloonLoad' | 'mappingChaos' | 'numberCognition';
 

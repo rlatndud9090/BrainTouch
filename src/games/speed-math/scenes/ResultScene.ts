@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { BASE_COLORS } from '../../../shared/colors';
 import { createGradientBackground, createButton, showToast } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
-import { shareGameResult, getShareOutcomeMessage } from '../../../shared/share';
+import { shareGameResultWithFeedback } from '../../../shared/share';
 
 interface ResultData {
   totalTime: number;
@@ -17,23 +17,6 @@ export class ResultScene extends Phaser.Scene {
 
   init(data: ResultData): void {
     this.totalTime = data.totalTime || 0;
-  }
-
-  private async shareResult(): Promise<void> {
-    const timeSeconds = (this.totalTime / 1000).toFixed(2);
-    const outcome = await shareGameResult({
-      gameId: 'speed-math',
-      gameTitle: '스피드 계산',
-      metricLabel: '기록(초)',
-      metricValue: timeSeconds,
-    });
-
-    const message = getShareOutcomeMessage(outcome);
-    if (message) {
-      showToast(this, message, {
-        color: outcome === 'unsupported' ? '#ff6b6b' : '#4ecca3',
-      });
-    }
   }
 
   create(): void {
@@ -102,7 +85,17 @@ export class ResultScene extends Phaser.Scene {
       height * 0.82,
       '공유하기',
       () => {
-        void this.shareResult();
+        void shareGameResultWithFeedback(
+          {
+            gameId: 'speed-math',
+            gameTitle: '스피드 계산',
+            metricLabel: '기록(초)',
+            metricValue: (this.totalTime / 1000).toFixed(2),
+          },
+          (message, options) => {
+            showToast(this, message, options);
+          }
+        );
       },
       {
         bgColor: 0x5865f2,
