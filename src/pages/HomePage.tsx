@@ -1,38 +1,5 @@
 import GameCard from '../components/GameCard';
-
-// 게임 목록 데이터 (추후 확장)
-const games = [
-  {
-    id: 'brain-touch',
-    title: '🧠 몸풀기 터치',
-    description: '빠른 터치로 두뇌를 깨워보세요!',
-    color: 'from-purple-500 to-pink-500',
-  },
-  {
-    id: 'speed-math',
-    title: '🔢 스피드 계산',
-    description: '20문제 사칙연산을 최대한 빠르게!',
-    color: 'from-green-500 to-teal-500',
-  },
-  {
-    id: 'math-flight',
-    title: '🚀 중간값 비행',
-    description: '운석을 피하며 중간값을 찾아라!',
-    color: 'from-cyan-500 to-blue-500',
-  },
-  {
-    id: 'block-sum',
-    title: '🧱 블록셈',
-    description: '블록을 빼서 목표 숫자를 맞춰라!',
-    color: 'from-yellow-500 to-orange-500',
-  },
-  {
-    id: 'number-balloon',
-    title: '🎈 숫자풍선',
-    description: '작은 숫자부터 순서대로 터뜨려라!',
-    color: 'from-pink-400 to-rose-500',
-  },
-];
+import { GAME_CATALOG } from '../shared/gameCatalog';
 
 export default function HomePage() {
   return (
@@ -54,13 +21,19 @@ export default function HomePage() {
         <h2 className="text-lg font-semibold text-toss-gray-200 mb-4">게임 선택</h2>
 
         <div className="grid gap-4">
-          {games.map((game) => (
-            <GameCard key={game.id} {...game} />
+          {GAME_CATALOG.map((game) => (
+            <GameCard
+              key={game.id}
+              id={game.id}
+              title={`${game.card.emoji} ${game.title}`}
+              description={game.card.description}
+              color={game.card.gradient}
+            />
           ))}
         </div>
 
         {/* 빈 상태 */}
-        {games.length === 0 && (
+        {GAME_CATALOG.length === 0 && (
           <div className="flex items-center justify-center h-40 text-toss-gray-400">
             게임을 준비 중입니다...
           </div>

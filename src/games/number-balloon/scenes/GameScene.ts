@@ -1,4 +1,4 @@
-﻿import Phaser from 'phaser';
+import Phaser from 'phaser';
 import { BalloonData, generateBalloons, getCorrectOrder } from '../utils/BalloonGenerator';
 import {
   DifficultyAxis,

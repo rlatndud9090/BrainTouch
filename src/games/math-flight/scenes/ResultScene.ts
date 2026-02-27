@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { BASE_COLORS } from '../../../shared/colors';
 import { createButton, showToast } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
-import { shareGameResult, getShareOutcomeMessage } from '../../../shared/share';
+import { shareGameResultWithFeedback } from '../../../shared/share';
 
 // 색상 상수
 const COLORS = {
@@ -33,22 +33,6 @@ export class ResultScene extends Phaser.Scene {
     this.totalScore = data.totalScore || 0;
     this.survivalTime = data.survivalTime || 0;
     this.turnCount = data.turnCount || 0;
-  }
-
-  private async shareResult(): Promise<void> {
-    const outcome = await shareGameResult({
-      gameId: 'math-flight',
-      gameTitle: '중간값 비행',
-      metricLabel: '점수',
-      metricValue: this.totalScore,
-    });
-
-    const message = getShareOutcomeMessage(outcome);
-    if (message) {
-      showToast(this, message, {
-        color: outcome === 'unsupported' ? '#ff6b6b' : '#4ecca3',
-      });
-    }
   }
 
   create(): void {
@@ -117,7 +101,17 @@ export class ResultScene extends Phaser.Scene {
       height * 0.8,
       '공유하기',
       () => {
-        void this.shareResult();
+        void shareGameResultWithFeedback(
+          {
+            gameId: 'math-flight',
+            gameTitle: '중간값 비행',
+            metricLabel: '점수',
+            metricValue: this.totalScore,
+          },
+          (message, options) => {
+            showToast(this, message, options);
+          }
+        );
       },
       {
         bgColor: 0x5865f2,

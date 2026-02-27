@@ -1,4 +1,4 @@
-﻿import Phaser from 'phaser';
+import Phaser from 'phaser';
 import { BlockData, RoundData, generateRound, canAchieveTarget, calculateSum } from '../utils/BlockGenerator';
 import {
   DifficultyAxis,
@@ -47,6 +47,8 @@ const TIMER_BAR_COLORS = {
 interface BlockSprite {
   data: BlockData;
   container: Phaser.GameObjects.Container;
+  bgGraphics: Phaser.GameObjects.Graphics;
+  originalColor: number;
   isRemoving: boolean;
 }
 
@@ -168,22 +170,17 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerup', () => {
       if (!this.selectedBlock) return;
 
-      const container = this.selectedBlock.container as any;
-      const bg = container.bgGraphics as Phaser.GameObjects.Graphics;
-      const originalColor = container.originalColor;
-
-      if (bg && originalColor !== undefined) {
-        const radius = 16;
-        bg.clear();
-        bg.fillStyle(originalColor, 1);
-        bg.fillRoundedRect(
-          -this.blockWidth / 2,
-          -this.blockHeight / 2,
-          this.blockWidth,
-          this.blockHeight,
-          radius
-        );
-      }
+      const { bgGraphics, originalColor } = this.selectedBlock;
+      const radius = 16;
+      bgGraphics.clear();
+      bgGraphics.fillStyle(originalColor, 1);
+      bgGraphics.fillRoundedRect(
+        -this.blockWidth / 2,
+        -this.blockHeight / 2,
+        this.blockWidth,
+        this.blockHeight,
+        radius
+      );
 
       this.selectedBlock = null;
     });
@@ -349,6 +346,8 @@ export class GameScene extends Phaser.Scene {
     const blockSprite: BlockSprite = {
       data,
       container,
+      bgGraphics: bg,
+      originalColor: blockColor,
       isRemoving: false,
     };
 
@@ -370,9 +369,6 @@ export class GameScene extends Phaser.Scene {
         radius
       );
     });
-
-    (container as any).originalColor = blockColor;
-    (container as any).bgGraphics = bg;
 
     return blockSprite;
   }
@@ -653,4 +649,3 @@ export class GameScene extends Phaser.Scene {
     this.handleTimerBarResize(width);
   }
 }
-

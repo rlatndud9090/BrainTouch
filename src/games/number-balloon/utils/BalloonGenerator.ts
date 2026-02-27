@@ -1,4 +1,4 @@
-﻿import { COLORFUL_PALETTE } from '../../../shared/colors';
+import { COLORFUL_PALETTE } from '../../../shared/colors';
 
 export interface BalloonData {
   id: number;

@@ -15,6 +15,10 @@ export interface ShareGameResultInput {
   metricValue: string | number;
 }
 
+interface ShareFeedbackOptions {
+  color: string;
+}
+
 function buildGameUrl(gameId: string): string {
   if (typeof window === 'undefined') return '';
   return `${window.location.origin}${window.location.pathname}#/share/${encodeURIComponent(gameId)}`;
@@ -70,4 +74,20 @@ export function getShareOutcomeMessage(outcome: ShareOutcome): string | null {
   if (outcome === 'copied') return '공유 문구를 복사했어요';
   if (outcome === 'unsupported') return '이 기기에서는 공유를 지원하지 않아요';
   return null;
+}
+
+export async function shareGameResultWithFeedback(
+  input: ShareGameResultInput,
+  onMessage: (message: string, options: ShareFeedbackOptions) => void
+): Promise<ShareOutcome> {
+  const outcome = await shareGameResult(input);
+  const message = getShareOutcomeMessage(outcome);
+
+  if (message) {
+    onMessage(message, {
+      color: outcome === 'unsupported' ? '#ff6b6b' : '#4ecca3',
+    });
+  }
+
+  return outcome;
 }
