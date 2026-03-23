@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_COLORS } from '../../../shared/colors';
-import { createButton, showToast } from '../../../shared/ui';
+import { createButton } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
-import { shareGameResultWithFeedback } from '../../../shared/share';
 
 // 게임 색상
 const COLORS = {
@@ -93,35 +92,7 @@ export class ResultScene extends Phaser.Scene {
     createButton(
       this,
       width / 2,
-      height * 0.8,
-      '공유하기',
-      () => {
-        void shareGameResultWithFeedback(
-          {
-            gameId: 'number-balloon',
-            gameTitle: '숫자풍선',
-            metricLabel: '점수',
-            metricValue: this.score,
-          },
-          (message, options) => {
-            showToast(this, message, options);
-          }
-        );
-      },
-      {
-        bgColor: 0x5865f2,
-        hoverColor: 0x6a75f4,
-        textColor: '#ffffff',
-        width: 200,
-        height: 54,
-        triggerOnPointerDown: true,
-      }
-    );
-
-    createButton(
-      this,
-      width / 2,
-      height * 0.9,
+      height * 0.82,
       '홈으로',
       () => {
         this.game.events.emit('gameOver', {

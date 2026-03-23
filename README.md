@@ -53,8 +53,8 @@ BrainTouch/
 │   │       ├── config.ts      # 해당 게임 Phaser 설정
 │   │       ├── scenes/        # GameScene / ResultScene 등
 │   │       └── utils/         # 게임별 로직 유틸
-│   ├── pages/                 # 라우트 페이지 (Home, Game, Share)
-│   ├── shared/                # 공통 UI/상수/공유/분배 로직
+│   ├── pages/                 # 라우트 페이지 (Home, Game)
+│   ├── shared/                # 공통 UI/상수 로직
 │   ├── App.tsx                # 라우팅 루트
 │   └── main.tsx               # React 진입점
 ├── android/                   # Capacitor Android 프로젝트
