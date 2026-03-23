@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
-import { GameSceneHW } from './scenes/GameSceneHW';
 import { ResultScene } from './scenes/ResultScene';
 import { createHighResScale } from '../../shared/constants';
 
@@ -17,7 +16,7 @@ export function getGameConfig(
     parent,
     backgroundColor: '#1a1a2e',
     scale: createHighResScale(parent.clientWidth, parent.clientHeight),
-    scene: [GameScene, GameSceneHW, ResultScene],
+    scene: [GameScene, ResultScene],
     input: {
       activePointers: 3,
       touch: {

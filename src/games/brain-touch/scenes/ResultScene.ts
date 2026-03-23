@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_COLORS, THEME_PRESETS } from '../../../shared/colors';
-import { createGradientBackground, createButton, showToast } from '../../../shared/ui';
+import { createGradientBackground, createButton } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
-import { shareGameResultWithFeedback } from '../../../shared/share';
 
 const THEME = THEME_PRESETS.brainTouch;
 
@@ -102,8 +101,7 @@ export class ResultScene extends Phaser.Scene {
       const buttonGap = 16;
       const bottomMargin = 24;
       const menuButtonY = height - bottomMargin - buttonHeight / 2;
-      const shareButtonY = menuButtonY - (buttonHeight + buttonGap);
-      const retryButtonY = shareButtonY - (buttonHeight + buttonGap);
+      const retryButtonY = menuButtonY - (buttonHeight + buttonGap);
       // 다시하기 버튼
       createButton(
         this,
@@ -118,35 +116,6 @@ export class ResultScene extends Phaser.Scene {
           hoverColor: THEME.accentHover,
           width: 200,
           height: buttonHeight,
-        }
-      );
-
-      // 공유하기 버튼
-      createButton(
-        this,
-        width / 2,
-        shareButtonY,
-        '공유하기',
-        () => {
-          void shareGameResultWithFeedback(
-            {
-              gameId: 'brain-touch',
-              gameTitle: '몸풀기 터치',
-              metricLabel: '점수',
-              metricValue: this.resultData.score,
-            },
-            (message, options) => {
-              showToast(this, message, options);
-            }
-          );
-        },
-        {
-          bgColor: 0x5865f2,
-          hoverColor: 0x6a75f4,
-          textColor: '#ffffff',
-          width: 200,
-          height: buttonHeight,
-          triggerOnPointerDown: true,
         }
       );
 

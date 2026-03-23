@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_COLORS } from '../../../shared/colors';
-import { createGradientBackground, createButton, showToast } from '../../../shared/ui';
+import { createGradientBackground, createButton } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
-import { shareGameResultWithFeedback } from '../../../shared/share';
 
 interface ResultData {
   totalTime: number;
@@ -82,35 +81,7 @@ export class ResultScene extends Phaser.Scene {
     createButton(
       this,
       width / 2,
-      height * 0.82,
-      '공유하기',
-      () => {
-        void shareGameResultWithFeedback(
-          {
-            gameId: 'speed-math',
-            gameTitle: '스피드 계산',
-            metricLabel: '기록(초)',
-            metricValue: (this.totalTime / 1000).toFixed(2),
-          },
-          (message, options) => {
-            showToast(this, message, options);
-          }
-        );
-      },
-      {
-        bgColor: 0x5865f2,
-        hoverColor: 0x6a75f4,
-        textColor: '#ffffff',
-        width: 200,
-        height: 54,
-        triggerOnPointerDown: true,
-      }
-    );
-
-    createButton(
-      this,
-      width / 2,
-      height * 0.91,
+      height * 0.84,
       '홈으로',
       () => {
         this.game.events.emit('gameOver', { totalTime: this.totalTime });

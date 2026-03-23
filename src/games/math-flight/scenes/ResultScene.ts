@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_COLORS } from '../../../shared/colors';
-import { createButton, showToast } from '../../../shared/ui';
+import { createButton } from '../../../shared/ui';
 import { FONTS } from '../../../shared/constants';
-import { shareGameResultWithFeedback } from '../../../shared/share';
 
 // 색상 상수
 const COLORS = {
@@ -98,35 +97,7 @@ export class ResultScene extends Phaser.Scene {
     createButton(
       this,
       width / 2,
-      height * 0.8,
-      '공유하기',
-      () => {
-        void shareGameResultWithFeedback(
-          {
-            gameId: 'math-flight',
-            gameTitle: '중간값 비행',
-            metricLabel: '점수',
-            metricValue: this.totalScore,
-          },
-          (message, options) => {
-            showToast(this, message, options);
-          }
-        );
-      },
-      {
-        bgColor: 0x5865f2,
-        hoverColor: 0x6a75f4,
-        textColor: '#ffffff',
-        width: 200,
-        height: 54,
-        triggerOnPointerDown: true,
-      }
-    );
-
-    createButton(
-      this,
-      width / 2,
-      height * 0.9,
+      height * 0.82,
       '홈으로',
       () => {
         this.game.events.emit('gameOver', {

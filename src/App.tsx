@@ -1,7 +1,6 @@
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import GamePage from './pages/GamePage';
-import ShareLandingPage from './pages/ShareLandingPage';
 
 function App() {
   return (
@@ -9,11 +8,10 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/game/:gameId" element={<GamePage />} />
-        <Route path="/share/:gameId" element={<ShareLandingPage />} />
+        <Route path="/share/:gameId" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
 }
 
 export default App;
-
