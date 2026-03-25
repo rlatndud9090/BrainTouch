@@ -49,6 +49,7 @@ export class MainScene extends Phaser.Scene {
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupResizeListener, this);
   }
 
   private createUI(): void {
@@ -300,6 +301,10 @@ export class MainScene extends Phaser.Scene {
 
     // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);
+  }
+
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
   }
 
   update(): void {

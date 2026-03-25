@@ -160,6 +160,7 @@ export class GameScene extends Phaser.Scene {
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupResizeListener, this);
   }
 
   private getTextResolution(): number {
@@ -631,5 +632,9 @@ export class GameScene extends Phaser.Scene {
       this.player.y = this.playerY;
       this.playerBody?.setDisplaySize(this.playerSize, this.playerSize);
     }
+  }
+
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
   }
 }
