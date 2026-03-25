@@ -129,6 +129,8 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.scale.on('resize', this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupResizeListener, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.cleanupResizeListener, this);
   }
 
   update(): void {
@@ -616,6 +618,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
+  }
+
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
@@ -625,4 +631,3 @@ export class GameScene extends Phaser.Scene {
     this.handleTimerBarResize(width);
   }
 }
-

@@ -49,6 +49,8 @@ export class MainScene extends Phaser.Scene {
 
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupResizeListener, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.cleanupResizeListener, this);
   }
 
   private createUI(): void {
@@ -293,6 +295,10 @@ export class MainScene extends Phaser.Scene {
       score: this.score,
       timeUp: this.timeLeft <= 0,
     });
+  }
+
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
   }
 
   private handleResize(gameSize: Phaser.Structs.Size): void {
