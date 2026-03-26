@@ -88,7 +88,6 @@ export class GameScene extends Phaser.Scene {
     // 리사이즈 대응
     this.scale.on('resize', this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupResizeListener, this);
-    this.events.once(Phaser.Scenes.Events.DESTROY, this.cleanupResizeListener, this);
   }
 
   private showGameUI(): void {

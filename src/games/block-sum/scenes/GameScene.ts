@@ -142,7 +142,6 @@ export class GameScene extends Phaser.Scene {
 
     this.scale.on('resize', this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupResizeListener, this);
-    this.events.once(Phaser.Scenes.Events.DESTROY, this.cleanupResizeListener, this);
   }
 
   private calculateLayout(width: number, height: number): void {
