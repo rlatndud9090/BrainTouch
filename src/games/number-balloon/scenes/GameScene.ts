@@ -131,6 +131,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.scale.on('resize', this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupResizeListener, this);
   }
 
   update(): void {
@@ -627,6 +628,10 @@ export class GameScene extends Phaser.Scene {
       maxRound: this.round,
       totalPopped: this.totalPopped,
     });
+  }
+
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
   }
 
   private handleResize(gameSize: Phaser.Structs.Size): void {
