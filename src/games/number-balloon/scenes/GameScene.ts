@@ -398,7 +398,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.time.delayedCall(500, () => {
-      if (this.isPlaying) {
+      if (this.isPlaying && this.roundTimeLeft > 0 && this.roundTimerEvent) {
         this.isInputLocked = false;
       }
     });
