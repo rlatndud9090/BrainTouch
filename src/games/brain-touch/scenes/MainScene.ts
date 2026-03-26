@@ -296,15 +296,15 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
+  }
+
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width } = gameSize;
 
     // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);
-  }
-
-  private cleanupResizeListener(): void {
-    this.scale.off('resize', this.handleResize, this);
   }
 
   update(): void {

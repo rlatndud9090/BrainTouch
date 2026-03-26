@@ -471,6 +471,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
+  }
+
   update(): void {
     if (this.isPlaying) {
       const elapsed = Date.now() - this.startTime;
@@ -484,9 +488,5 @@ export class GameScene extends Phaser.Scene {
 
     // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);
-  }
-
-  private cleanupResizeListener(): void {
-    this.scale.off('resize', this.handleResize, this);
   }
 }

@@ -617,6 +617,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
+  }
+
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
@@ -624,9 +628,5 @@ export class GameScene extends Phaser.Scene {
 
     this.topBar?.handleResize(width);
     this.handleTimerBarResize(width);
-  }
-
-  private cleanupResizeListener(): void {
-    this.scale.off('resize', this.handleResize, this);
   }
 }
