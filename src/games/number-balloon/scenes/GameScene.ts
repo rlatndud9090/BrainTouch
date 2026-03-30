@@ -60,6 +60,7 @@ export class GameScene extends Phaser.Scene {
   private totalPopped = 0;
   private successfulRounds = 0;
   private isPlaying = false;
+  private isInputLocked = false;
 
   private difficultyLevels: DifficultyAxisLevels = createInitialDifficultyLevels();
   private difficultyUpgradeHistory: DifficultyAxis[] = [];
@@ -96,6 +97,7 @@ export class GameScene extends Phaser.Scene {
     this.totalPopped = 0;
     this.successfulRounds = 0;
     this.isPlaying = false;
+    this.isInputLocked = false;
 
     this.difficultyLevels = createInitialDifficultyLevels();
     this.difficultyUpgradeHistory = [];
@@ -268,6 +270,7 @@ export class GameScene extends Phaser.Scene {
 
     this.balloonBodies = [];
     this.currentIndex = 0;
+    this.isInputLocked = false;
 
     const roundDifficulty = resolveRoundDifficulty(this.round, this.difficultyLevels);
     this.balloons = generateBalloons(roundDifficulty.generationConfig, this.gameAreaWidth, this.gameAreaHeight);
@@ -328,7 +331,7 @@ export class GameScene extends Phaser.Scene {
     };
 
     graphics.on('pointerdown', () => {
-      if (!this.isPlaying || balloonBody.isPopped) {
+      if (!this.isPlaying || this.isInputLocked || balloonBody.isPopped) {
         return;
       }
 
@@ -380,6 +383,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleWrongTap(balloon: BalloonBody): void {
+    this.isInputLocked = true;
     this.applyDifficultyDowngradeOnFail('wrongTap');
 
     const isGameOver = this.topBar.loseLife('left');
@@ -390,7 +394,14 @@ export class GameScene extends Phaser.Scene {
       this.time.delayedCall(500, () => {
         this.endGame();
       });
+      return;
     }
+
+    this.time.delayedCall(500, () => {
+      if (this.isPlaying && this.roundTimeLeft > 0 && this.roundTimerEvent) {
+        this.isInputLocked = false;
+      }
+    });
   }
 
   private popBalloon(balloon: BalloonBody, success: boolean): void {
@@ -562,6 +573,7 @@ export class GameScene extends Phaser.Scene {
 
   private handleTimeOut(): void {
     this.roundTimerEvent?.destroy();
+    this.isInputLocked = true;
 
     this.applyDifficultyDowngradeOnFail('timeout');
 
@@ -609,6 +621,7 @@ export class GameScene extends Phaser.Scene {
 
   private endGame(): void {
     this.isPlaying = false;
+    this.isInputLocked = true;
 
     this.scene.start('ResultScene', {
       score: this.score,
