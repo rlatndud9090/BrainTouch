@@ -376,10 +376,11 @@ export class GameScene extends Phaser.Scene {
 
   private removeBlock(blockSprite: BlockSprite, direction: 'left' | 'right' = 'left'): void {
     if (blockSprite.isRemoving) return;
-    blockSprite.isRemoving = true;
 
     const index = this.blockSprites.indexOf(blockSprite);
     if (index === -1) return;
+    blockSprite.isRemoving = true;
+    this.blockSprites.splice(index, 1);
 
     const targetX = direction === 'left' ? -this.blockWidth - 50 : this.blockWidth + 50;
 
@@ -390,7 +391,6 @@ export class GameScene extends Phaser.Scene {
       duration: 200,
       ease: 'Quad.easeIn',
       onComplete: () => {
-        this.blockSprites.splice(index, 1);
         blockSprite.container.destroy();
         this.checkAutoSuccess();
       },
@@ -643,14 +643,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private cleanupResizeListener(): void {
-    this.scale.off('resize', this.handleResize, this);
-  }
-
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width } = gameSize;
     this.calculateLayout(width, gameSize.height);
     this.topBar?.handleResize(width);
     this.handleTimerBarResize(width);
+  }
+
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
   }
 }
