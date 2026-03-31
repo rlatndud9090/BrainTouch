@@ -26,7 +26,6 @@
 | **TypeScript**    | ^5.3.3  | 타입 안정성                 |
 | **Vite**          | ^5.4.11 | 번들러 & 개발 서버          |
 | **TailwindCSS**   | ^3.4.3  | UI 스타일링                 |
-| **TensorFlow.js** | ^4.x    | 필기 숫자 인식 (speed-math) |
 
 ---
 
@@ -36,16 +35,17 @@
 ┌─────────────────────────────────────────┐
 │              React App                  │
 ├─────────────────────────────────────────┤
-│  HomePage   │  GamePage  │  RankingPage │  ← React 페이지
-├─────────────┴────────────┴──────────────┤
+│   HomePage   │   GamePage   │   Share Route   │  ← React 라우트
+├──────────────┴──────────────┴─────────────────┤
 │         PhaserGame 컴포넌트             │  ← React-Phaser 브릿지
 ├─────────────────────────────────────────┤
 │           Phaser 3 Game                 │  ← 게임 로직
-│  (brain-touch, speed-math, block-sum)   │
+│ (brain-touch, speed-math, math-flight,  │
+│   block-sum, number-balloon)            │
 └─────────────────────────────────────────┘
 ```
 
-- **UI/메뉴/랭킹**: React + TailwindCSS
+- **UI/메뉴/공유 라우팅**: React + TailwindCSS
 - **게임 플레이**: Phaser 3 캔버스
 
 ---
@@ -61,7 +61,6 @@ BrainTouch/
 │   ├── pages/
 │   │   ├── HomePage.tsx            # 게임 목록 (카드뷰)
 │   │   ├── GamePage.tsx            # 게임 플레이 화면
-│   │   └── RankingPage.tsx         # 랭킹 화면
 │   ├── components/
 │   │   ├── GameCard.tsx            # 게임 카드 컴포넌트
 │   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
@@ -81,13 +80,10 @@ BrainTouch/
 │       │   ├── DESIGN.md           # 게임 설계 문서
 │       │   ├── config.ts           # Phaser 설정
 │       │   ├── scenes/
-│       │   │   ├── ModeSelectScene.ts # 모드 선택 (현재 숫자패드만)
 │       │   │   ├── GameScene.ts    # 숫자패드 모드 게임 씬
-│       │   │   ├── GameSceneHW.ts  # 필기 입력 모드 (임시 비활성화)
 │       │   │   └── ResultScene.ts  # 결과 화면
 │       │   └── utils/
-│       │       ├── QuestionGenerator.ts  # 문제 생성기
-│       │       └── DigitRecognizer.ts    # TensorFlow.js 숫자 인식
+│       │       └── QuestionGenerator.ts  # 문제 생성기
 │       ├── math-flight/            # Math Flight 게임 (중간값 찾기)
 │       │   ├── DESIGN.md           # 게임 설계 문서
 │       │   ├── config.ts           # Phaser 설정
@@ -96,14 +92,24 @@ BrainTouch/
 │       │   │   └── ResultScene.ts  # 결과 화면
 │       │   └── utils/
 │       │       └── MeteorGenerator.ts  # 운석 생성 알고리즘
-│       └── block-sum/              # Block Sum 게임 (블록셈)
+│       ├── block-sum/              # Block Sum 게임 (블록셈)
+│       │   ├── DESIGN.md           # 게임 설계 문서
+│       │   ├── config.ts           # Phaser 설정
+│       │   ├── scenes/
+│       │   │   ├── GameScene.ts    # 메인 게임 씬
+│       │   │   └── ResultScene.ts  # 결과 화면
+│       │   └── utils/
+│       │       ├── BlockGenerator.ts     # 블록 생성 알고리즘
+│       │       └── DifficultyDirector.ts # 축 기반 난이도 제어
+│       └── number-balloon/         # Number Balloon 게임 (숫자풍선)
 │           ├── DESIGN.md           # 게임 설계 문서
 │           ├── config.ts           # Phaser 설정
 │           ├── scenes/
 │           │   ├── GameScene.ts    # 메인 게임 씬
 │           │   └── ResultScene.ts  # 결과 화면
 │           └── utils/
-│               └── BlockGenerator.ts   # 블록 생성 알고리즘
+│               ├── BalloonGenerator.ts   # 풍선 생성 알고리즘
+│               └── DifficultyDirector.ts # 축 기반 난이도 제어
 ├── public/                         # 정적 에셋
 │   └── assets/                     # 이미지, 오디오, 폰트
 ├── index.html                      # HTML 템플릿
@@ -125,12 +131,13 @@ BrainTouch/
 ### `src/main.tsx`
 
 - React 앱 진입점
-- BrowserRouter 래핑
+- HashRouter 래핑
 
 ### `src/App.tsx`
 
 - React Router 설정
-- 페이지 라우팅: `/`, `/game/:gameId`, `/ranking`
+- 페이지 라우팅: `/`, `/game/:gameId`, `/share/:gameId`
+- `/share/:gameId`는 레거시 공유 링크를 현재 게임 경로로 리다이렉트
 
 ### `src/components/PhaserGame.tsx`
 
@@ -165,7 +172,8 @@ BrainTouch/
 - `scenes/GameScene.ts`: 메인 게임 씬 (자유 이동, 운석 낙하, 충돌 판정)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/MeteorGenerator.ts`: 운석 생성 알고리즘 (난이도별 분포)
-- **규칙**: 5개 운석 중 가장 큰 수/작은 수 피하고 중간 3개 맞추기
+- **규칙**: 3개 운석 중 정확히 중간값 운석에 충돌하면 점수 획득
+- **점수**: 중간값 정확히 충돌 시 `+200`, 최소/최대 운석 충돌 시 라이프 감소
 - 상세 내용은 `src/games/math-flight/DESIGN.md` 참조
 
 ### `src/games/block-sum/`
