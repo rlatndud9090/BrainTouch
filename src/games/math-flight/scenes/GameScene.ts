@@ -94,6 +94,7 @@ export class GameScene extends Phaser.Scene {
   private topBar!: TopBar;
   private player!: Phaser.GameObjects.Container;
   private playerBody!: Phaser.GameObjects.Image;
+  private laneLines?: Phaser.GameObjects.Graphics;
 
   // 운석
   private meteors: MeteorSprite[] = [];
@@ -214,12 +215,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createLaneLines(width: number, height: number): void {
-    const graphics = this.add.graphics();
-    graphics.lineStyle(1, BASE_COLORS.LANE_LINE, 0.3);
+    this.laneLines ??= this.add.graphics();
+    this.laneLines.clear();
+    this.laneLines.lineStyle(1, BASE_COLORS.LANE_LINE, 0.3);
 
     for (let i = 1; i < LANE_POSITIONS.length; i++) {
       const x = Math.round(width * ((LANE_POSITIONS[i - 1] + LANE_POSITIONS[i]) / 2));
-      graphics.lineBetween(x, 60, x, height - 50);
+      this.laneLines.lineBetween(x, 60, x, height - 50);
     }
   }
 
@@ -424,6 +426,42 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private refreshMeteorSpriteLayout(meteor: MeteorSprite): void {
+    meteor.container.x = this.laneXPositions[meteor.data.lane];
+    meteor.container.y = Math.round(meteor.y);
+
+    const trailOffsetY = -Math.round(this.meteorRadius * METEOR_FLAME_VERTICAL_OFFSET_FACTOR);
+    const trailWidth = Math.round(this.meteorRadius * METEOR_FLAME_WRAP_WIDTH_FACTOR);
+    const trailHeight = Math.round(this.meteorRadius * METEOR_FLAME_WRAP_HEIGHT_FACTOR);
+    const coreSize = Math.round(this.meteorRadius * METEOR_CORE_DISPLAY_FACTOR);
+    const splitSize = Math.round(this.meteorRadius * METEOR_SPLIT_DISPLAY_FACTOR);
+    const fontSize = Math.max(18, Math.floor(this.meteorRadius * 0.75));
+    const strokeThickness = Math.max(3, Math.round(fontSize * 0.11));
+
+    if (meteor.trail.scene) {
+      meteor.trail.y = trailOffsetY;
+      meteor.trail.setDisplaySize(trailWidth, trailHeight);
+    }
+
+    meteor.core.setDisplaySize(
+      meteor.label.visible ? coreSize : splitSize,
+      meteor.label.visible ? coreSize : splitSize,
+    );
+
+    meteor.label.setStyle({
+      fontSize: `${fontSize}px`,
+      strokeThickness,
+    });
+    meteor.label.setShadow(
+      0,
+      2,
+      METEOR_LABEL_SHADOW_COLOR,
+      Math.max(2, Math.round(fontSize * 0.08)),
+      false,
+      true,
+    );
+  }
+
   private checkCollisions(): void {
     if (this.hasCollidedThisWave) return;
 
@@ -618,13 +656,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private cleanupResizeListener(): void {
-    this.scale.off('resize', this.handleResize, this);
-  }
-
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width, height } = gameSize;
     this.calculateLayout(width, height);
+    this.createLaneLines(width, height);
 
     this.topBar?.handleResize(width);
 
@@ -636,5 +671,11 @@ export class GameScene extends Phaser.Scene {
       this.player.y = this.playerY;
       this.playerBody?.setDisplaySize(this.playerSize, this.playerSize);
     }
+
+    this.meteors.forEach((meteor) => this.refreshMeteorSpriteLayout(meteor));
+  }
+
+  private cleanupResizeListener(): void {
+    this.scale.off('resize', this.handleResize, this);
   }
 }
