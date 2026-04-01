@@ -215,7 +215,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createLaneLines(width: number, height: number): void {
-    this.laneLines ??= this.add.graphics();
+    if (!this.laneLines || !this.laneLines.scene) {
+      this.laneLines = this.add.graphics();
+    }
     this.laneLines.clear();
     this.laneLines.lineStyle(1, BASE_COLORS.LANE_LINE, 0.3);
 
@@ -677,5 +679,6 @@ export class GameScene extends Phaser.Scene {
 
   private cleanupResizeListener(): void {
     this.scale.off('resize', this.handleResize, this);
+    this.laneLines = undefined;
   }
 }
