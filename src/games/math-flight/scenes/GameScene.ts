@@ -29,6 +29,7 @@ const METEOR_FLAME_WRAP_WIDTH_FACTOR = 5.5;
 const METEOR_FLAME_WRAP_HEIGHT_FACTOR = 3.52;
 const METEOR_FLAME_VERTICAL_OFFSET_FACTOR = 0.5;
 const MEDIAN_HIT_DURATION_MS = 500;
+const COLLISION_THRESHOLD = 20;
 const METEOR_LABEL_SHADOW_COLOR = 'rgba(0, 0, 0, 0.45)';
 const MAX_TEXT_RESOLUTION = 3;
 
@@ -467,9 +468,6 @@ export class GameScene extends Phaser.Scene {
   private checkCollisions(): void {
     if (this.hasCollidedThisWave) return;
 
-    // 판정 허용 범위 (Y 좌표 기준)
-    const collisionThreshold = 20;
-
     // 플레이어가 현재 어느 레인에 있는지 판정
     const playerLane = this.getPlayerLane();
 
@@ -481,8 +479,8 @@ export class GameScene extends Phaser.Scene {
 
       // 운석이 판정 라인을 지나갔는지 체크
       const crossedLine =
-        meteor.y >= this.collisionLineY - collisionThreshold &&
-        meteor.y <= this.collisionLineY + collisionThreshold;
+        meteor.y >= this.collisionLineY - COLLISION_THRESHOLD &&
+        meteor.y <= this.collisionLineY + COLLISION_THRESHOLD;
 
       if (crossedLine) {
         // 이 운석의 레인과 플레이어 레인이 같으면 충돌!
@@ -499,7 +497,7 @@ export class GameScene extends Phaser.Scene {
       }
 
       // 운석이 판정 라인을 완전히 지나갔으면 처리 완료로 표시
-      if (meteor.y > this.collisionLineY + collisionThreshold) {
+      if (meteor.y > this.collisionLineY + COLLISION_THRESHOLD) {
         meteor.processed = true;
       }
     }
@@ -630,14 +628,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private checkNextWave(): void {
-    const midY = this.scale.height * 0.5;
-    const allPassed = this.meteors.every((m) => m.y > midY);
+    const waveResolvedY = this.collisionLineY + COLLISION_THRESHOLD;
+    const waveResolved =
+      this.meteors.length > 0 && this.meteors.every((meteor) => meteor.y > waveResolvedY);
 
-    if (allPassed && this.meteors.length > 0) {
-      const hasUpcoming = this.meteors.some((m) => m.y < midY);
-      if (!hasUpcoming) {
-        this.spawnMeteorWave();
-      }
+    // 다음 웨이브는 현재 운석이 실제 판정선을 모두 지난 뒤에만 시작한다.
+    if (waveResolved) {
+      this.spawnMeteorWave();
+      return;
     }
 
     // 모든 운석이 화면 밖으로 나갔으면 새 웨이브
