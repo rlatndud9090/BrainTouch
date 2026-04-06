@@ -13,20 +13,35 @@ export default function PhaserGame({ gameId, onGameOver }: PhaserGameProps) {
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
+    let disposed = false;
 
     // 폰트 로딩 완료 후 게임 시작
     const loadGame = async () => {
       try {
         // 폰트 로딩 대기 (Cherry Bomb One 등)
         await waitForFonts();
+        if (disposed) return;
 
         // 게임별 설정 동적 import
         const gameModule = await import(`../games/${gameId}/config.ts`);
-        const config = gameModule.getGameConfig(containerRef.current!, onGameOver);
-        
-        gameRef.current = new Phaser.Game(config);
+        if (disposed) return;
+
+        const container = containerRef.current;
+        if (!container) return;
+
+        const config = gameModule.getGameConfig(container, onGameOver);
+        const game = new Phaser.Game(config);
+
+        if (disposed) {
+          game.destroy(true);
+          return;
+        }
+
+        gameRef.current = game;
       } catch (error) {
-        console.error(`Failed to load game: ${gameId}`, error);
+        if (!disposed) {
+          console.error(`Failed to load game: ${gameId}`, error);
+        }
       }
     };
 
@@ -34,6 +49,7 @@ export default function PhaserGame({ gameId, onGameOver }: PhaserGameProps) {
 
     // Cleanup
     return () => {
+      disposed = true;
       if (gameRef.current) {
         gameRef.current.destroy(true);
         gameRef.current = null;
@@ -64,4 +80,3 @@ export default function PhaserGame({ gameId, onGameOver }: PhaserGameProps) {
     />
   );
 }
-
