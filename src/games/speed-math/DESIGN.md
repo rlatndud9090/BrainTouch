@@ -94,22 +94,11 @@
 5. 오답 시: 빨간색 흔들림 → 자동 지움 → 재입력 대기
 6. 정답 시: 문제가 위로 스크롤 + 새 문제가 아래서 등장
 
-**일반 모드:**
+**현재 구현:**
 
 - 숫자 배치: 1-9 고정, 계산기 레이아웃
-
-**어려움 모드 (랜덤 패드):**
-
-- 매 문제마다 숫자 위치 랜덤 셔플
-- 시각적 혼란으로 난이도 상승
-
-```
-[어려움 모드 예시]
-      [5]   [2]   [9]
-      [1]   [7]   [4]
-      [3]   [6]   [8]
-            [0]   [C]
-```
+- 추가 모드 선택 없이 단일 숫자패드 흐름만 제공합니다.
+- 랜덤 패드, 필기 입력 같은 대체 입력 방식은 현재 구현에 포함되지 않습니다.
 
 ---
 
@@ -141,7 +130,6 @@ speed-math/
     ▼
 [ResultScene] ───── 결과 표시
     │               - 클리어 시간
-    │               - 최고 기록 비교
     │               - 다시하기/홈으로
     ▼
 [홈 or 재시작]
@@ -228,13 +216,12 @@ interface Question {
 
 ```typescript
 interface GameState {
-  mode: 'handwriting' | 'keypad-normal' | 'keypad-hard';
-  currentQuestion: number; // 현재 문제 인덱스 (0-19)
+  currentQuestionIndex: number; // 현재 문제 인덱스 (0-19)
   questions: Question[]; // 20개 문제 배열
+  currentInput: string; // 현재 입력 중인 답
   startTime: number; // 게임 시작 타임스탬프
   elapsedTime: number; // 경과 시간 (ms)
   isPlaying: boolean;
-  wrongAttempts: number; // 현재 문제 오답 횟수
 }
 ```
 
@@ -242,11 +229,7 @@ interface GameState {
 
 ```typescript
 interface GameResult {
-  mode: string;
   totalTime: number; // 총 소요 시간 (ms)
-  totalWrongAttempts: number; // 총 오답 횟수
-  date: Date;
-  isNewRecord: boolean;
 }
 ```
 
@@ -264,20 +247,18 @@ interface GameResult {
 
 ## 🔮 향후 확장
 
-### Phase 1 (MVP) ✅ 완료
+현재 구현 기준 단일 소스 오브 트루스는 `config.ts`, `GameScene.ts`, `ResultScene.ts`입니다. 아래 항목은 **현재 구현**이 아니라 **백로그 아이디어**입니다.
+
+### 현재 구현 완료 범위
 
 - [x] 기본 게임 로직
-- [x] 숫자패드 입력 모드
+- [x] 단일 숫자패드 입력 모드
 - [x] 타이머 & 결과 화면
 
-### Phase 2 ✅ 완료
+### 백로그 후보
 
-- [ ] 어려움 모드 (랜덤 패드)
+- [ ] 랜덤 패드 기반 고난도 모드
 - [ ] 로컬 최고 기록 저장
-
-### Phase 3
-
-- [ ] 토스 계정 연동
 - [ ] 서버 랭킹 시스템
 - [ ] 일일 챌린지 모드
 
@@ -305,7 +286,7 @@ interface GameResult {
 
 ### 4단계: 확장 기능 ⏳ 보류
 
-- [ ] 어려움 모드 추가
+- [ ] 랜덤 패드 기반 고난도 모드 검토
 - [ ] 로컬 최고 기록 저장
 - [ ] 추가 입력 방식 검토
 
@@ -317,5 +298,4 @@ interface GameResult {
 
 ---
 
-_작성일: 2025-12-14_
-_최종 수정: 2025-12-14 (v6 - 3문제 동시 표시 + 모바일 레이아웃 최적화)_
+_작성일: 2025-12-14 / 최종 업데이트: 2026-04-07 (단일 키패드 구현 기준 문서 동기화)_
