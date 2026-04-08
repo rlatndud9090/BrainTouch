@@ -26,7 +26,6 @@
 | **TypeScript**    | ^5.3.3  | 타입 안정성                 |
 | **Vite**          | ^5.4.11 | 번들러 & 개발 서버          |
 | **TailwindCSS**   | ^3.4.3  | UI 스타일링                 |
-| **TensorFlow.js** | ^4.x    | 필기 숫자 인식 (speed-math) |
 
 ---
 
@@ -101,7 +100,8 @@ BrainTouch/
 │       │   │   ├── GameScene.ts    # 메인 게임 씬
 │       │   │   └── ResultScene.ts  # 결과 화면
 │       │   └── utils/
-│       │       └── BlockGenerator.ts   # 블록 생성 알고리즘
+│       │       ├── BlockGenerator.ts   # 블록 생성 알고리즘
+│       │       └── DifficultyDirector.ts # 축 기반 난이도/시간 제어
 │       └── number-balloon/         # Number Balloon 게임 (숫자풍선)
 │           ├── DESIGN.md           # 게임 설계 문서
 │           ├── config.ts           # Phaser 설정
@@ -132,7 +132,7 @@ BrainTouch/
 ### `src/main.tsx`
 
 - React 앱 진입점
-- BrowserRouter 래핑
+- HashRouter 래핑
 
 ### `src/App.tsx`
 
