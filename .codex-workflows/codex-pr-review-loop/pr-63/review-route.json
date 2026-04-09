@@ -1,20 +1,18 @@
 {
   "kind": "review_route",
   "route": "direct-fix",
-  "summary": "localized documentation wording fixes for block-count and balloon-load cadence",
+  "summary": "single-line correction for late-round number-balloon load cadence",
   "confidence": "high",
   "reasons": [
-    "accepted comments target two specific sentences in documentation only",
-    "the source-of-truth cadence is explicit in DifficultyDirector implementations",
-    "no architecture or product decision change is required"
+    "accepted comment targets one incorrect value in one sentence",
+    "DifficultyDirector table directly proves the correct value",
+    "no broader wording or architecture change is needed"
   ],
   "accepted_items": [
-    "discussion_r3055133279",
-    "discussion_r3055133280"
+    "discussion_r3055923674"
   ],
   "blocking_unknowns": [],
   "handoff_notes": [
-    "spell out the actual round boundaries for block count and balloon load increases",
-    "keep the change limited to block-sum and number-balloon design docs"
+    "change 37+ balloon count from 7개 to 8~9개 to match load level 2"
   ]
 }
