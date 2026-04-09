@@ -1,18 +1,18 @@
 {
   "kind": "review_route",
   "route": "direct-fix",
-  "summary": "single-line correction for late-round number-balloon load cadence",
+  "summary": "single-line correction for mid-round number-balloon load cadence",
   "confidence": "high",
   "reasons": [
-    "accepted comment targets one incorrect value in one sentence",
-    "DifficultyDirector table directly proves the correct value",
-    "no broader wording or architecture change is needed"
+    "accepted comment targets one incorrect range in one sentence",
+    "the adjacent table and DifficultyDirector implementation give the exact correct range",
+    "no broader rework is needed"
   ],
   "accepted_items": [
-    "discussion_r3055923674"
+    "discussion_r3055943651"
   ],
   "blocking_unknowns": [],
   "handoff_notes": [
-    "change 37+ balloon count from 7개 to 8~9개 to match load level 2"
+    "change 13~36 balloon count from 6개 to 6~7개 to match load level 1"
   ]
 }
