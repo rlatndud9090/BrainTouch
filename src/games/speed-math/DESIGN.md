@@ -218,12 +218,12 @@ interface Question {
 
 ```typescript
 interface GameState {
-  currentQuestion: number; // 현재 문제 인덱스 (0-19)
+  currentQuestionIndex: number; // 현재 문제 인덱스 (0-19)
   questions: Question[]; // 20개 문제 배열
+  currentInput: string; // 현재 입력 중인 답
   startTime: number; // 게임 시작 타임스탬프
   elapsedTime: number; // 경과 시간 (ms)
   isPlaying: boolean;
-  wrongAttempts: number; // 현재 문제 오답 횟수
 }
 ```
 
