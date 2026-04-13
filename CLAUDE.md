@@ -21,7 +21,7 @@
 | 기술              | 버전    | 용도                        |
 | ----------------- | ------- | --------------------------- |
 | **React**         | ^18.2.0 | UI 프레임워크               |
-| **React Router**  | ^6.22.3 | 페이지 라우팅               |
+| **React Router**  | ^6.30.3 | HashRouter 기반 페이지 라우팅 |
 | **Phaser 3**      | ^3.80.1 | 2D 게임 엔진 (게임 코어만)  |
 | **TypeScript**    | ^5.3.3  | 타입 안정성                 |
 | **Vite**          | ^5.4.11 | 번들러 & 개발 서버          |
@@ -35,7 +35,7 @@
 ┌─────────────────────────────────────────┐
 │              React App                  │
 ├─────────────────────────────────────────┤
-│   HomePage   │   GamePage   │   Share Route   │  ← React 라우트
+│   HomePage   │   GamePage   │   Legacy Share Redirect │  ← React 라우트
 ├──────────────┴──────────────┴─────────────────┤
 │         PhaserGame 컴포넌트             │  ← React-Phaser 브릿지
 ├─────────────────────────────────────────┤
@@ -45,8 +45,9 @@
 └─────────────────────────────────────────┘
 ```
 
-- **UI/메뉴/공유 라우팅**: React + TailwindCSS
+- **UI/메뉴/공유 라우팅**: React + TailwindCSS + HashRouter
 - **게임 플레이**: Phaser 3 캔버스
+- **게임 목록 기준 문서**: `src/shared/gameCatalog.ts`
 
 ---
 
@@ -56,7 +57,7 @@
 BrainTouch/
 ├── src/
 │   ├── main.tsx                    # React 진입점
-│   ├── App.tsx                     # 라우터 설정
+│   ├── App.tsx                     # 라우터 설정 (/, /game/:gameId, /share/:gameId)
 │   ├── index.css                   # 글로벌 스타일 + Tailwind
 │   ├── pages/
 │   │   ├── HomePage.tsx            # 게임 목록 (카드뷰)
@@ -65,6 +66,7 @@ BrainTouch/
 │   │   ├── GameCard.tsx            # 게임 카드 컴포넌트
 │   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
 │   ├── shared/                     # 공통 모듈
+│   │   ├── gameCatalog.ts          # 홈/게임 라우트 공통 게임 카탈로그
 │   │   ├── colors.ts               # 공통 색상 팔레트 + 테마 프리셋
 │   │   ├── constants.ts            # 공통 상수 (GAME_LAYOUT 등)
 │   │   ├── lives.ts                # 목숨 관리 (LivesManager 클래스)
@@ -137,6 +139,7 @@ BrainTouch/
 
 - React Router 설정
 - 페이지 라우팅: `/`, `/game/:gameId`, `/share/:gameId`
+- `getGameCatalogItem` 기준으로 유효하지 않은 공유 링크를 가드
 - `/share/:gameId`는 레거시 공유 링크를 현재 게임 경로로 리다이렉트
 
 ### `src/components/PhaserGame.tsx`
@@ -162,6 +165,7 @@ BrainTouch/
 - `scenes/GameScene.ts`: 메인 게임 씬 (숫자패드, 타이머, 정답 처리)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/QuestionGenerator.ts`: 20문제 생성기 (+, -, ×)
+- 현재 구현에는 필기 모드/TensorFlow 경로가 포함되지 않음
 - 상세 내용은 `src/games/speed-math/DESIGN.md` 참조
 
 ### `src/games/math-flight/`
@@ -184,9 +188,10 @@ BrainTouch/
 - `scenes/GameScene.ts`: 메인 게임 씬 (블록 탑, 스와이프 제거, 둥근 모서리, 형형색색 블록)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/BlockGenerator.ts`: 블록 생성 및 목표 숫자 알고리즘
+- `utils/DifficultyDirector.ts`: 시간 레벨 + 목표 복잡도 축 기반 난이도 제어
 - **규칙**: 블록을 스와이프로 제거하여 남은 블록 합 = 목표 숫자
-- **시스템**: 라운드당 제한시간 (초반 10초→후반 6초) + 하트 3개, 시간초과/실패 시 하트 감소
-- **난이도**: 하(4개, 1~5, 목표≤15)→중(5개, 1~9, 목표≤25)→상(5개, 1~9, 목표 무제한), 연속 3회 성공 시 승급
+- **시스템**: 하트 3개, 라운드 제한시간, 실패 시 난이도 축 하향
+- **참고**: 세부 수치와 현재 난이도 축은 `src/games/block-sum/DESIGN.md`, `DifficultyDirector.ts`를 단일 기준으로 확인
 - 상세 내용은 `src/games/block-sum/DESIGN.md` 참조
 
 ### `src/games/number-balloon/`
@@ -197,9 +202,10 @@ BrainTouch/
 - `scenes/GameScene.ts`: 메인 게임 씬 (풍선 터치, 순서 체크)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/BalloonGenerator.ts`: 풍선 생성 알고리즘 (정렬 기반 매칭 + index 교환)
+- `utils/DifficultyDirector.ts`: 풍선 수/크기/인지 혼란도/시간 축 기반 난이도 제어
 - **규칙**: 작은 숫자부터 순서대로 풍선 터뜨리기
-- **시스템**: 라운드당 제한시간 (초반 10초→후반 6초) + 하트 3개, 시간초과/실패 시 하트 감소
-- **난이도**: 풍선 개수 증가 + 크기-숫자 불일치(페이크) 비율 증가
+- **시스템**: 하트 3개, 라운드 제한시간, 실패 시 난이도 축 하향
+- **참고**: 세부 수치와 현재 난이도 축은 `src/games/number-balloon/DESIGN.md`, `DifficultyDirector.ts`를 단일 기준으로 확인
 - 상세 내용은 `src/games/number-balloon/DESIGN.md` 참조
 
 ### `src/shared/`
@@ -252,23 +258,18 @@ refactor/<game-name>-<description>
 - [x] 프로젝트 초기 환경 구축 (Vite + TS + Phaser3)
 - [x] React + Phaser 하이브리드 아키텍처로 마이그레이션
 - [x] TailwindCSS 설정
-- [x] 페이지 구조 생성 (Home, Game, Ranking)
+- [x] 페이지 구조 생성 (Home, Game, Legacy Share Redirect)
 - [x] Phaser 래퍼 컴포넌트 구현
-- [x] Brain Touch 기본 게임 로직 구현
+- [x] Brain Touch, Speed Math, Math Flight, Block Sum, Number Balloon MVP 구현
 - [x] 개발 컨벤션 문서 작성
 - [x] GitHub 리포지토리 연결
+- [x] 공통 HUD/라이프/카운트다운 유틸 통합
+- [x] 공유 결과 링크를 현재 게임 라우트로 정리
 
 ### 🔄 진행중
 
-- [x] Speed Math 게임 MVP 구현 완료 (숫자패드 모드)
-- [x] Speed Math 필기 인식 모드 구현 (임시 비활성화 - 인식률 개선 필요)
-- [x] Math Flight 게임 MVP 구현 완료 (중간값 찾기)
-- [x] Block Sum 게임 MVP 구현 완료 (블록셈)
-- [x] Number Balloon 게임 MVP 구현 완료 (숫자풍선)
-- [x] 공통 모듈 분리 (colors.ts, ui.ts, lives.ts)
-- [x] showStartScreen 공통화 (Brain Touch, Speed Math, Math Flight, Block Sum, Number Balloon)
-- [x] LivesManager 공통화 (Brain Touch, Math Flight)
-- [x] TopBar 공통화 (전체 게임 상단 HUD 통일)
+- [x] 문서 기준을 각 게임 `DESIGN.md`와 관련 utility로 정리 중
+- [x] Android 배포 준비용 이슈 분리 추적 중 (#33 ~ #39)
 
 ### 🔲 예정
 
@@ -280,8 +281,8 @@ refactor/<game-name>-<description>
 - [ ] 에셋 추가 (이미지, 사운드)
 - [ ] 점수 저장 시스템
 - [ ] 토스 계정 연동
-- [ ] 랭킹 시스템 구현
 - [ ] 앱인토스 배포 테스트
+- [ ] Android 릴리스 빌드/스토어 제출 체인 정리
 
 ---
 
@@ -307,6 +308,7 @@ refactor/<game-name>-<description>
 
 | 날짜       | 작업 내용                                              |
 | ---------- | ------------------------------------------------------ |
+| 2026-04-13 | CLAUDE.md 구조/라우트/게임 상태 설명을 현재 코드 기준으로 동기화 |
 | 2026-01-04 | 블록셈 버그 수정: O/X 애니메이션 중 스와이프 차단       |
 | 2026-01-04 | 모바일 고해상도(DPR) 지원: 전체 게임 config에 적용      |
 | 2026-01-03 | Cherry Bomb One 폰트 적용 + 폰트 로딩 대기 로직 추가    |
@@ -337,4 +339,4 @@ refactor/<game-name>-<description>
 
 ---
 
-_마지막 업데이트: 2026-01-04 (블록셈 버그 수정 + 모바일 고해상도 지원)_
+_마지막 업데이트: 2026-04-13 (CLAUDE.md 현재 구조 동기화)_
