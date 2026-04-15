@@ -48,6 +48,8 @@ interface BlockSprite {
   data: BlockData;
   container: Phaser.GameObjects.Container;
   bgGraphics: Phaser.GameObjects.Graphics;
+  hitArea: Phaser.GameObjects.Rectangle;
+  valueText: Phaser.GameObjects.Text;
   originalColor: number;
   isRemoving: boolean;
 }
@@ -76,6 +78,7 @@ export class GameScene extends Phaser.Scene {
   private telemetryEntries: RoundTelemetryEntry[] = [];
 
   private topBar!: TopBar;
+  private background?: Phaser.GameObjects.Graphics;
   private targetLabel!: Phaser.GameObjects.Text;
   private targetText!: Phaser.GameObjects.Text;
   private blockContainer!: Phaser.GameObjects.Container;
@@ -122,7 +125,7 @@ export class GameScene extends Phaser.Scene {
     this.telemetryEntries = [];
 
     this.calculateLayout(width, height);
-    createGradientBackground(this, width, height);
+    this.background = createGradientBackground(this, width, height).setDepth(-1);
 
     this.createHUD();
     this.createTargetArea(width, height);
@@ -348,6 +351,8 @@ export class GameScene extends Phaser.Scene {
       data,
       container,
       bgGraphics: bg,
+      hitArea,
+      valueText: text,
       originalColor: blockColor,
       isRemoving: false,
     };
@@ -643,11 +648,56 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private redrawBackground(width: number, height: number): void {
+    this.background?.destroy();
+    this.background = createGradientBackground(this, width, height).setDepth(-1);
+  }
+
+  private updateTargetAreaLayout(width: number, height: number): void {
+    const targetY = height * 0.15;
+    this.targetLabel?.setPosition(width / 2, targetY - 25);
+    this.targetText?.setPosition(width / 2, targetY + 15);
+    this.blockContainer?.setPosition(width / 2, height * 0.5);
+  }
+
+  private refreshActiveBlockLayout(): void {
+    const activeBlocks = this.blockSprites.filter((blockSprite) => !blockSprite.isRemoving);
+    const totalHeight = activeBlocks.length * (this.blockHeight + this.blockGap) - this.blockGap;
+    const startY = -totalHeight / 2 + this.blockHeight / 2;
+    const radius = 16;
+
+    activeBlocks.forEach((blockSprite, index) => {
+      const y = startY + index * (this.blockHeight + this.blockGap);
+      const fillColor =
+        this.selectedBlock === blockSprite ? COLORS.BLOCK_SELECTED : blockSprite.originalColor;
+
+      blockSprite.container.setPosition(0, y);
+      blockSprite.container.setSize(this.blockWidth, this.blockHeight);
+
+      blockSprite.bgGraphics.clear();
+      blockSprite.bgGraphics.fillStyle(fillColor, 1);
+      blockSprite.bgGraphics.fillRoundedRect(
+        -this.blockWidth / 2,
+        -this.blockHeight / 2,
+        this.blockWidth,
+        this.blockHeight,
+        radius
+      );
+
+      blockSprite.hitArea.setSize(this.blockWidth, this.blockHeight);
+      blockSprite.valueText.setFontSize(`${Math.max(Math.round(this.blockHeight * 0.5), 32)}px`);
+      blockSprite.valueText.setPosition(0, 0);
+    });
+  }
+
   private handleResize(gameSize: Phaser.Structs.Size): void {
-    const { width } = gameSize;
+    const { width, height } = gameSize;
     this.calculateLayout(width, gameSize.height);
+    this.redrawBackground(width, height);
     this.topBar?.handleResize(width);
     this.handleTimerBarResize(width);
+    this.updateTargetAreaLayout(width, height);
+    this.refreshActiveBlockLayout();
   }
 
   private cleanupResizeListener(): void {
