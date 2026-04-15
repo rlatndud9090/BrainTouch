@@ -35,8 +35,8 @@
 ┌─────────────────────────────────────────┐
 │              React App                  │
 ├─────────────────────────────────────────┤
-│   HomePage   │   GamePage   │   Share Route   │  ← React 라우트
-├──────────────┴──────────────┴─────────────────┤
+│  HomePage   │  GamePage  │ LegacyShare  │  ← React 페이지
+├─────────────┴────────────┴──────────────┤
 │         PhaserGame 컴포넌트             │  ← React-Phaser 브릿지
 ├─────────────────────────────────────────┤
 │           Phaser 3 Game                 │  ← 게임 로직
@@ -45,7 +45,7 @@
 └─────────────────────────────────────────┘
 ```
 
-- **UI/메뉴/공유 라우팅**: React + TailwindCSS
+- **UI/메뉴/공유 리다이렉트**: React + TailwindCSS
 - **게임 플레이**: Phaser 3 캔버스
 
 ---
@@ -61,6 +61,7 @@ BrainTouch/
 │   ├── pages/
 │   │   ├── HomePage.tsx            # 게임 목록 (카드뷰)
 │   │   ├── GamePage.tsx            # 게임 플레이 화면
+│   │   └── (share 라우트는 App.tsx 내부 redirect 컴포넌트 사용)
 │   ├── components/
 │   │   ├── GameCard.tsx            # 게임 카드 컴포넌트
 │   │   └── PhaserGame.tsx          # Phaser 래퍼 컴포넌트
@@ -99,8 +100,8 @@ BrainTouch/
 │       │   │   ├── GameScene.ts    # 메인 게임 씬
 │       │   │   └── ResultScene.ts  # 결과 화면
 │       │   └── utils/
-│       │       ├── BlockGenerator.ts     # 블록 생성 알고리즘
-│       │       └── DifficultyDirector.ts # 축 기반 난이도 제어
+│       │       ├── BlockGenerator.ts   # 블록 생성 알고리즘
+│       │       └── DifficultyDirector.ts # 축 기반 난이도/시간 제어
 │       └── number-balloon/         # Number Balloon 게임 (숫자풍선)
 │           ├── DESIGN.md           # 게임 설계 문서
 │           ├── config.ts           # Phaser 설정
@@ -108,7 +109,7 @@ BrainTouch/
 │           │   ├── GameScene.ts    # 메인 게임 씬
 │           │   └── ResultScene.ts  # 결과 화면
 │           └── utils/
-│               ├── BalloonGenerator.ts   # 풍선 생성 알고리즘
+│               ├── BalloonGenerator.ts # 풍선 생성 알고리즘
 │               └── DifficultyDirector.ts # 축 기반 난이도 제어
 ├── public/                         # 정적 에셋
 │   └── assets/                     # 이미지, 오디오, 폰트
@@ -137,7 +138,6 @@ BrainTouch/
 
 - React Router 설정
 - 페이지 라우팅: `/`, `/game/:gameId`, `/share/:gameId`
-- `/share/:gameId`는 레거시 공유 링크를 현재 게임 경로로 리다이렉트
 
 ### `src/components/PhaserGame.tsx`
 
@@ -172,8 +172,7 @@ BrainTouch/
 - `scenes/GameScene.ts`: 메인 게임 씬 (자유 이동, 운석 낙하, 충돌 판정)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/MeteorGenerator.ts`: 운석 생성 알고리즘 (난이도별 분포)
-- **규칙**: 3개 운석 중 정확히 중간값 운석에 충돌하면 점수 획득
-- **점수**: 중간값 정확히 충돌 시 `+200`, 최소/최대 운석 충돌 시 라이프 감소
+- **규칙**: 3개 운석 중 정확히 중간값 1개만 맞추면 성공
 - 상세 내용은 `src/games/math-flight/DESIGN.md` 참조
 
 ### `src/games/block-sum/`
@@ -184,9 +183,11 @@ BrainTouch/
 - `scenes/GameScene.ts`: 메인 게임 씬 (블록 탑, 스와이프 제거, 둥근 모서리, 형형색색 블록)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/BlockGenerator.ts`: 블록 생성 및 목표 숫자 알고리즘
+- `utils/DifficultyDirector.ts`: 축 기반 난이도/시간/점수 배수 제어
 - **규칙**: 블록을 스와이프로 제거하여 남은 블록 합 = 목표 숫자
-- **시스템**: 라운드당 제한시간 (초반 10초→후반 6초) + 하트 3개, 시간초과/실패 시 하트 감소
-- **난이도**: 하(4개, 1~5, 목표≤15)→중(5개, 1~9, 목표≤25)→상(5개, 1~9, 목표 무제한), 연속 3회 성공 시 승급
+- **시스템**: 라운드당 제한시간 `6초→5초→4초` + 하트 3개, 시간초과/실패 시 하트 감소
+- **난이도**: `blockCount`/`numberRange`/`targetComplexity` 축을 조합하며 점수 배수는 `1 + difficultyScore * 2`
+- **참고**: 최신 상세 수치와 하향 규칙은 `src/games/block-sum/DESIGN.md` 및 `utils/DifficultyDirector.ts` 기준
 - 상세 내용은 `src/games/block-sum/DESIGN.md` 참조
 
 ### `src/games/number-balloon/`
@@ -197,9 +198,11 @@ BrainTouch/
 - `scenes/GameScene.ts`: 메인 게임 씬 (풍선 터치, 순서 체크)
 - `scenes/ResultScene.ts`: 결과 화면
 - `utils/BalloonGenerator.ts`: 풍선 생성 알고리즘 (정렬 기반 매칭 + index 교환)
+- `utils/DifficultyDirector.ts`: 축 기반 난이도/시간 제어
 - **규칙**: 작은 숫자부터 순서대로 풍선 터뜨리기
-- **시스템**: 라운드당 제한시간 (초반 10초→후반 6초) + 하트 3개, 시간초과/실패 시 하트 감소
-- **난이도**: 풍선 개수 증가 + 크기-숫자 불일치(페이크) 비율 증가
+- **시스템**: 라운드당 제한시간 `6초→5초→4초` + 하트 3개, 시간초과/실패 시 하트 감소
+- **난이도**: `balloonLoad`/`mappingChaos`/`numberCognition` 축을 조합하며 실패 시 일부 축이 하향될 수 있음
+- **참고**: 최신 상세 수치와 축별 레벨은 `src/games/number-balloon/DESIGN.md` 및 `utils/DifficultyDirector.ts` 기준
 - 상세 내용은 `src/games/number-balloon/DESIGN.md` 참조
 
 ### `src/shared/`
