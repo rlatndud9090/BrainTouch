@@ -1,7 +1,19 @@
+import { Suspense, lazy } from 'react';
 import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import HomePage from './pages/HomePage';
-import GamePage from './pages/GamePage';
 import { getGameCatalogItem } from './shared/gameCatalog';
+
+const GamePage = lazy(() => import('./pages/GamePage'));
+
+function RouteLoadingFallback() {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-toss-black px-6 text-white">
+      <div className="rounded-2xl border border-toss-gray-600 bg-toss-gray-700/80 px-5 py-4 text-sm text-toss-gray-200">
+        게임 화면을 불러오는 중입니다...
+      </div>
+    </div>
+  );
+}
 
 function LegacyShareInvalidPage() {
   return (
@@ -36,11 +48,13 @@ function LegacyShareRedirect() {
 function App() {
   return (
     <div className="w-full h-full">
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/game/:gameId" element={<GamePage />} />
-        <Route path="/share/:gameId" element={<LegacyShareRedirect />} />
-      </Routes>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/game/:gameId" element={<GamePage />} />
+          <Route path="/share/:gameId" element={<LegacyShareRedirect />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 }
