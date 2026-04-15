@@ -30,6 +30,7 @@ export class GameScene extends Phaser.Scene {
 
   // UI 요소
   private topBar!: TopBar;
+  private background?: Phaser.GameObjects.Graphics;
 
   // 문제 표시 (3개)
   private questionContainer!: Phaser.GameObjects.Container;
@@ -103,14 +104,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground(width: number, height: number): void {
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(
+    this.background = this.add.graphics().setDepth(-1);
+    this.background.fillGradientStyle(
       COLORS.BG_PRIMARY,
       COLORS.BG_PRIMARY,
       COLORS.BG_SECONDARY,
       COLORS.BG_SECONDARY
     );
-    bg.fillRect(0, 0, width, height);
+    this.background.fillRect(0, 0, width, height);
   }
 
   private createHUD(): void {
@@ -484,7 +485,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleResize(gameSize: Phaser.Structs.Size): void {
-    const { width } = gameSize;
+    const { width, height } = gameSize;
+    const questionAlpha = this.questionContainer?.alpha ?? 0;
+    const padAlpha = this.padContainer?.alpha ?? 0;
+
+    this.background?.destroy();
+    this.questionContainer?.destroy();
+    this.padContainer?.destroy();
+
+    this.createBackground(width, height);
+    this.createQuestionArea(width, height);
+    this.createNumberPad(width, height);
+
+    this.questionContainer.setAlpha(questionAlpha);
+    this.padContainer.setAlpha(padAlpha);
+    this.updateQuestionDisplay();
+    this.updateAnswerDisplay();
 
     // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);

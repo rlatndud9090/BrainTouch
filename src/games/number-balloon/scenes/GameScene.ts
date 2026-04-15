@@ -75,6 +75,8 @@ export class GameScene extends Phaser.Scene {
   private currentIndex = 0;
 
   private topBar!: TopBar;
+  private background?: Phaser.GameObjects.Graphics;
+  private clouds: Phaser.GameObjects.Graphics[] = [];
   private instructionText!: Phaser.GameObjects.Text;
   private timerBarBg!: Phaser.GameObjects.Rectangle;
   private timerBarFill!: Phaser.GameObjects.Rectangle;
@@ -84,6 +86,8 @@ export class GameScene extends Phaser.Scene {
   private gameAreaWidth = 0;
   private gameAreaHeight = 0;
   private gameAreaTop = 0;
+  private sceneWidth = 0;
+  private sceneHeight = 0;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -91,6 +95,8 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     const { width, height } = this.scale;
+    this.sceneWidth = width;
+    this.sceneHeight = height;
 
     this.score = 0;
     this.round = 1;
@@ -173,9 +179,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground(width: number, height: number): void {
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xb0e0e6, 0xb0e0e6);
-    bg.fillRect(0, 0, width, height);
+    this.background?.destroy();
+    this.clouds.forEach((cloud) => cloud.destroy());
+    this.clouds = [];
+
+    this.background = this.add.graphics().setDepth(-2);
+    this.background.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xb0e0e6, 0xb0e0e6);
+    this.background.fillRect(0, 0, width, height);
 
     this.addClouds(width);
   }
@@ -194,6 +204,8 @@ export class GameScene extends Phaser.Scene {
       cloud.fillCircle(25 * pos.scale, -5, 25 * pos.scale);
       cloud.fillCircle(50 * pos.scale, 0, 20 * pos.scale);
       cloud.setPosition(pos.x, pos.y);
+      cloud.setDepth(-1);
+      this.clouds.push(cloud);
     });
   }
 
@@ -634,12 +646,45 @@ export class GameScene extends Phaser.Scene {
     this.scale.off('resize', this.handleResize, this);
   }
 
+  private relayoutBalloonBodies(previousWidth: number, previousHeight: number): void {
+    this.balloonBodies.forEach((balloon) => {
+      if (balloon.isPopped) {
+        return;
+      }
+
+      const nextX = Phaser.Math.Clamp(
+        (balloon.body.position.x / Math.max(previousWidth, 1)) * this.gameAreaWidth,
+        balloon.data.size,
+        this.gameAreaWidth - balloon.data.size,
+      );
+      const nextY = Phaser.Math.Clamp(
+        (balloon.body.position.y / Math.max(previousHeight, 1)) * this.gameAreaHeight,
+        balloon.data.size,
+        this.gameAreaHeight - balloon.data.size,
+      );
+
+      balloon.data.x = nextX;
+      balloon.data.y = nextY;
+      this.matter.body.setPosition(balloon.body, { x: nextX, y: nextY });
+      balloon.graphics.setPosition(nextX, nextY + this.gameAreaTop);
+      balloon.text.setPosition(nextX, nextY + this.gameAreaTop);
+    });
+  }
+
   private handleResize(gameSize: Phaser.Structs.Size): void {
     const { width, height } = gameSize;
+    const previousGameAreaWidth = this.gameAreaWidth;
+    const previousGameAreaHeight = this.gameAreaHeight;
+
+    this.sceneWidth = width;
+    this.sceneHeight = height;
     this.calculateLayout(width, height);
+    this.createBackground(width, height);
     this.setupWorldBounds(width, height);
 
     this.topBar?.handleResize(width);
     this.handleTimerBarResize(width);
+    this.instructionText?.setPosition(width / 2, this.gameAreaTop - 30);
+    this.relayoutBalloonBodies(previousGameAreaWidth, previousGameAreaHeight);
   }
 }

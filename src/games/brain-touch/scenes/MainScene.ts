@@ -30,6 +30,9 @@ export class MainScene extends Phaser.Scene {
 
   // UI 요소
   private topBar!: TopBar;
+  private background?: Phaser.GameObjects.Graphics;
+  private sceneWidth = 0;
+  private sceneHeight = 0;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -37,9 +40,11 @@ export class MainScene extends Phaser.Scene {
 
   create(): void {
     const { width, height } = this.scale;
+    this.sceneWidth = width;
+    this.sceneHeight = height;
 
     // 배경
-    createGradientBackground(this, width, height);
+    this.background = createGradientBackground(this, width, height).setDepth(-1);
 
     // UI 초기화
     this.createUI();
@@ -300,11 +305,55 @@ export class MainScene extends Phaser.Scene {
     this.scale.off('resize', this.handleResize, this);
   }
 
+  private redrawBackground(width: number, height: number): void {
+    this.background?.destroy();
+    this.background = createGradientBackground(this, width, height).setDepth(-1);
+  }
+
   private handleResize(gameSize: Phaser.Structs.Size): void {
-    const { width } = gameSize;
+    const { width, height } = gameSize;
+    const previousWidth = this.sceneWidth;
+    const previousHeight = this.sceneHeight;
+
+    this.sceneWidth = width;
+    this.sceneHeight = height;
+    this.redrawBackground(width, height);
 
     // 상단 바 리사이즈 대응
     this.topBar?.handleResize(width);
+
+    const minTargetY = TOP_BAR.HEIGHT + 60;
+    const updatePoint = (x: number, y: number, radius: number) => {
+      const nextX = Phaser.Math.Clamp((x / Math.max(previousWidth, 1)) * width, radius + 24, width - radius - 24);
+      const nextY = Phaser.Math.Clamp(
+        (y / Math.max(previousHeight, 1)) * height,
+        minTargetY,
+        height - radius - 24,
+      );
+
+      return { x: nextX, y: nextY };
+    };
+
+    if (this.target) {
+      const { x, y } = updatePoint(
+        this.target.container.x,
+        this.target.container.y,
+        this.target.hitArea.radius,
+      );
+      this.target.container.setPosition(x, y);
+      this.target.hitArea.x = x;
+      this.target.hitArea.y = y;
+    }
+
+    if (this.fadingHitArea) {
+      const { x, y } = updatePoint(
+        this.fadingHitArea.x,
+        this.fadingHitArea.y,
+        this.fadingHitArea.radius,
+      );
+      this.fadingHitArea.x = x;
+      this.fadingHitArea.y = y;
+    }
   }
 
   update(): void {
